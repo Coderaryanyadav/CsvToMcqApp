@@ -22,15 +22,15 @@ Here is a glimpse of the application in action:
 
 | Dashboard | Uploading an Exam |
 | :---: | :---: |
-| <img src="assets/screenshots/1_dashboard.jpeg" width="400"/> | <img src="assets/screenshots/2_upload_dialog.jpeg" width="400"/> |
+| <img src="assets/screenshots/1_dashboard.png" width="400"/> | <img src="assets/screenshots/2_upload_dialog.png" width="400"/> |
 
 | Naming Your Exam | Populated Dashboard |
 | :---: | :---: |
-| <img src="assets/screenshots/3_name_exam.jpeg" width="400"/> | <img src="assets/screenshots/4_dashboard_populated.jpeg" width="400"/> |
+| <img src="assets/screenshots/3_name_exam.png" width="400"/> | <img src="assets/screenshots/4_dashboard_populated.png" width="400"/> |
 
 | Taking an Exam |
 | :---: |
-| <img src="assets/screenshots/5_exam_interface.jpeg" width="800"/> |
+| <img src="assets/screenshots/5_exam_interface.png" width="800"/> |
 
 ---
 
