@@ -1,0 +1,28 @@
+{
+  "id": "sample1",
+  "name": "General Knowledge - Sample",
+  "questions": [
+    {
+      "id": "s1q1",
+      "question": "What is the capital of France?",
+      "options": [
+        "Paris",
+        "London",
+        "Berlin",
+        "Rome"
+      ],
+      "correct": 0
+    },
+    {
+      "id": "s1q2",
+      "question": "2 + 2 = ?",
+      "options": [
+        "3",
+        "4",
+        "5",
+        "6"
+      ],
+      "correct": 1
+    }
+  ]
+}
