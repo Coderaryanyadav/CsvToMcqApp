@@ -5,6 +5,7 @@ import '../services/import_service.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
 import '../models/question.dart';
+import '../models/student_profile.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_logo.dart';
 import 'take_exam_screen.dart';
@@ -12,6 +13,7 @@ import 'statistics_screen.dart';
 import 'question_bank_screen.dart';
 import 'settings_screen.dart';
 import 'import_preview_screen.dart';
+import 'welcome_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _activeNavTab = 0; // 0: Dashboard, 1: Exams, 2: Question Bank, 3: History
   List<Exam> exams = [];
   List<ExamPerformance> performances = [];
+  StudentProfile? activeStudent;
   bool loading = true;
   final TextEditingController _searchCtrl = TextEditingController();
   String _examFilter = 'All'; // All | In Progress | Not Started | Completed
@@ -36,22 +39,35 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _initData() async {
     await StorageService.init();
-    // Wipe any legacy/old sample files to ensure a 100% clean state
-    await StorageService.clearAllData();
+    await StorageService.seedStarterDataIfEmpty();
     await _loadData();
   }
 
   Future<void> _loadData() async {
     setState(() => loading = true);
     final allExams = await StorageService.loadAllExams();
-    final allPerfs = StorageService.loadAllPerformances();
+    final student = await StorageService.getActiveStudent();
+    final allPerfs = await StorageService.loadPerformancesForActiveStudent();
 
     if (!mounted) return;
     setState(() {
       exams = allExams;
+      activeStudent = student;
       performances = allPerfs;
       loading = false;
     });
+  }
+
+  Future<void> _openStudentSwitcher() async {
+    final changed = await Navigator.push<StudentProfile>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WelcomeScreen(isSwitching: true),
+      ),
+    );
+    if (changed != null) {
+      await _loadData();
+    }
   }
 
   @override
@@ -305,8 +321,46 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: AppTheme.background,
+      bottomNavigationBar: isMobile
+          ? NavigationBar(
+              selectedIndex: (_activeNavTab >= 0 && _activeNavTab <= 2)
+                  ? _activeNavTab
+                  : (_activeNavTab == 4 ? 3 : 0),
+              onDestinationSelected: (idx) {
+                if (idx == 3) {
+                  setState(() => _activeNavTab = 4); // History tab
+                } else {
+                  setState(() => _activeNavTab = idx);
+                }
+              },
+              destinations: const [
+                NavigationDestination(
+                  icon: Icon(Icons.dashboard_outlined),
+                  selectedIcon: Icon(Icons.dashboard),
+                  label: 'Dashboard',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.assignment_outlined),
+                  selectedIcon: Icon(Icons.assignment),
+                  label: 'Exams',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.storage_outlined),
+                  selectedIcon: Icon(Icons.storage),
+                  label: 'Bank',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.history_outlined),
+                  selectedIcon: Icon(Icons.history),
+                  label: 'History',
+                ),
+              ],
+            )
+          : null,
       body: SafeArea(
         child: Column(
           children: [
@@ -324,6 +378,77 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Top QuizPro SaaS Navigation Bar
   Widget _buildTopNavBar() {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
+    if (isMobile) {
+      return Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: AppTheme.border)),
+        ),
+        child: Row(
+          children: [
+            const AppLogo(size: 32, fontSize: 18, showBadge: false),
+            const Spacer(),
+            // Student Profile Quick Switcher Pill
+            InkWell(
+              onTap: _openStudentSwitcher,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: (activeStudent != null
+                          ? Color(activeStudent!.avatarColorValue)
+                          : AppTheme.primaryNavy)
+                      .withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: (activeStudent != null
+                            ? Color(activeStudent!.avatarColorValue)
+                            : AppTheme.primaryNavy)
+                        .withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(activeStudent?.avatarEmoji ?? '🎓',
+                        style: const TextStyle(fontSize: 15)),
+                    const SizedBox(width: 4),
+                    Text(
+                      activeStudent?.name ?? 'Student',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: activeStudent != null
+                            ? Color(activeStudent!.avatarColorValue)
+                            : AppTheme.text,
+                      ),
+                    ),
+                    const Icon(Icons.arrow_drop_down,
+                        size: 16, color: Colors.grey),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            IconButton(
+              tooltip: 'Settings',
+              icon: const Icon(Icons.settings_outlined, size: 20),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()),
+                ).then((_) => _loadData());
+              },
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -382,21 +507,48 @@ class _HomeScreenState extends State<HomeScreen> {
                 },
               ),
               const SizedBox(width: 8),
-              const CircleAvatar(
-                radius: 18,
-                backgroundColor: AppTheme.primaryNavy,
-                child: Text('A',
-                    style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14)),
+              // Interactive Student Profile Switcher
+              InkWell(
+                onTap: _openStudentSwitcher,
+                borderRadius: BorderRadius.circular(24),
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: (activeStudent != null
+                            ? Color(activeStudent!.avatarColorValue)
+                            : AppTheme.primaryNavy)
+                        .withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: (activeStudent != null
+                              ? Color(activeStudent!.avatarColorValue)
+                              : AppTheme.primaryNavy)
+                          .withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(activeStudent?.avatarEmoji ?? '🎓',
+                          style: const TextStyle(fontSize: 18)),
+                      const SizedBox(width: 8),
+                      Text(
+                        activeStudent?.name ?? 'Select Student',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                          color: activeStudent != null
+                              ? Color(activeStudent!.avatarColorValue)
+                              : AppTheme.text,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Icon(Icons.swap_horiz,
+                          size: 18, color: Colors.grey),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: 8),
-              const Text('Aryan',
-                  style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 14,
-                      color: AppTheme.text)),
             ],
           ),
         ],
@@ -480,8 +632,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ? (totalCorrect / totalQuestionsAnswered) * 100
         : 0;
 
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 28,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -489,28 +646,82 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Dashboard Heading
-              const Text(
-                'Welcome to QuizPro',
-                style: TextStyle(
-                  fontSize: 28,
+              Text(
+                activeStudent != null
+                    ? 'Welcome, ${activeStudent!.name}! ${activeStudent!.avatarEmoji}'
+                    : 'Welcome to QuizPro',
+                style: const TextStyle(
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.text,
                   letterSpacing: -0.5,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
-                'Create and manage your MCQ question banks, practice, and track performance.',
-                style: TextStyle(
-                  fontSize: 15,
+              Text(
+                activeStudent != null
+                    ? 'Here is your active practice progress and performance overview.'
+                    : 'Create and manage your MCQ question banks, practice, and track performance.',
+                style: const TextStyle(
+                  fontSize: 13,
                   color: AppTheme.secondaryText,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
 
-              // KPI Stats Row
+              // KPI Stats Row / Grid
               LayoutBuilder(
                 builder: (context, constraints) {
+                  if (constraints.maxWidth < 600) {
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'Answered',
+                                value: '$totalQuestionsAnswered',
+                                icon: Icons.quiz_outlined,
+                                color: AppTheme.accentBlue,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'Avg Score',
+                                value: '${avgScore.toStringAsFixed(0)}%',
+                                icon: Icons.trending_up,
+                                color: AppTheme.success,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'Study Time',
+                                value: '${totalStudySecs ~/ 60} min',
+                                icon: Icons.timer_outlined,
+                                color: AppTheme.primaryNavy,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildMetricCard(
+                                label: 'Active Exams',
+                                value: '${exams.length}',
+                                icon: Icons.school_outlined,
+                                color: AppTheme.warning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    );
+                  }
+
                   return Row(
                     children: [
                       Expanded(
@@ -552,35 +763,39 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
               // Exams Cards Section
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
-                    'Your Exam Question Banks',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.text,
+                  const Expanded(
+                    child: Text(
+                      'Exam Question Banks',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.text,
+                      ),
                     ),
                   ),
                   TextButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('+ Add Exam'),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Exam'),
                     onPressed: _createExamDialog,
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // Exam Cards List or Clean Empty State
               if (exams.isEmpty)
                 Container(
                   width: double.infinity,
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 36),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -590,7 +805,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
                           color: AppTheme.accentBlue.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
@@ -598,28 +813,28 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Icon(
                           Icons.assignment_add,
                           color: AppTheme.accentBlue,
-                          size: 40,
+                          size: 36,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
                       const Text(
                         'No Exams Created Yet',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.text,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       const Text(
                         'Get started by creating a new exam track or importing your question bank from CSV or JSON.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 13,
                           color: AppTheme.secondaryText,
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 20),
                       Wrap(
                         spacing: 12,
                         runSpacing: 12,
@@ -646,19 +861,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: exams.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
+                  separatorBuilder: (_, __) => const SizedBox(height: 14),
                   itemBuilder: (context, index) {
                     final exam = exams[index];
                     return _buildExamDashboardCard(exam);
                   },
                 ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
               // Recent Activity Section
               const Text(
                 'Recent Activity',
                 style: TextStyle(
-                  fontSize: 18,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: AppTheme.text,
                 ),
@@ -666,7 +881,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
               if (performances.isEmpty)
                 Container(
-                  padding: const EdgeInsets.all(24),
+                  padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
@@ -675,7 +890,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: const Center(
                     child: Text(
                       'No practice sessions yet. Start a session to see your progress here.',
-                      style: TextStyle(color: AppTheme.secondaryText),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppTheme.secondaryText, fontSize: 13),
                     ),
                   ),
                 )
@@ -704,49 +920,50 @@ class _HomeScreenState extends State<HomeScreen> {
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppTheme.border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 18),
+              ),
+              Flexible(
+                child: Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.text,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.secondaryText,
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: AppTheme.secondaryText,
             ),
           ),
         ],
@@ -761,11 +978,11 @@ class _HomeScreenState extends State<HomeScreen> {
         : 0.0;
 
     final String subtitle = exam.questions.isNotEmpty
-        ? '${exam.questions.length} total questions • Ready for practice'
-        : 'No questions added yet • Import CSV/JSON to populate';
+        ? '${exam.questions.length} questions • Ready for practice'
+        : 'No questions yet • Tap below to import';
 
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
@@ -778,15 +995,15 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryNavy.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.school,
-                    color: AppTheme.primaryNavy, size: 28),
+                    color: AppTheme.primaryNavy, size: 24),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -794,7 +1011,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       exam.name,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 17,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.text,
                       ),
@@ -803,25 +1020,26 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       subtitle,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 12,
                         color: AppTheme.secondaryText,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.background,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppTheme.border),
                 ),
                 child: Text(
-                  '${exam.questions.length} Questions',
+                  '${exam.questions.length} Qs',
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.primaryNavy,
                   ),
@@ -829,7 +1047,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
           // Progress Bar & Info
           Row(
@@ -839,84 +1057,113 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: progressPct,
-                    minHeight: 8,
+                    minHeight: 6,
                     backgroundColor: AppTheme.border,
                     valueColor: const AlwaysStoppedAnimation<Color>(
                         AppTheme.accentBlue),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 12),
               Text(
-                '${(progressPct * 100).toInt()}% Progress',
+                '${(progressPct * 100).toInt()}%',
                 style: const TextStyle(
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                  fontSize: 12,
                   color: AppTheme.text,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           const Divider(height: 1),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
 
-          // Card Action Buttons
-          Row(
-            children: [
-              OutlinedButton.icon(
-                icon: const Icon(Icons.school_outlined, size: 18),
-                label: const Text('Practice'),
-                onPressed: exam.questions.isNotEmpty
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TakeExamScreen(
-                              exams: exams,
-                              initialExamId: exam.id,
-                              defaultToPractice: true,
-                            ),
+          // Card Action Buttons - Responsive Wrap
+          LayoutBuilder(
+            builder: (context, constraints) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.school_outlined, size: 16),
+                          label: const Text('Practice', style: TextStyle(fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
-                        ).then((_) => _loadData());
-                      }
-                    : null,
-              ),
-              const SizedBox(width: 12),
-              FilledButton.icon(
-                icon: const Icon(Icons.timer_outlined, size: 18),
-                label: const Text('Start Exam'),
-                onPressed: exam.questions.isNotEmpty
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => TakeExamScreen(
-                              exams: exams,
-                              initialExamId: exam.id,
-                            ),
-                          ),
-                        ).then((_) => _loadData());
-                      }
-                    : null,
-              ),
-              const Spacer(),
-              TextButton.icon(
-                icon: const Icon(Icons.storage, size: 18),
-                label: const Text('Question Bank'),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => QuestionBankScreen(
-                        exams: exams,
-                        initialExamId: exam.id,
+                          onPressed: exam.questions.isNotEmpty
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TakeExamScreen(
+                                        exams: exams,
+                                        initialExamId: exam.id,
+                                        defaultToPractice: true,
+                                      ),
+                                    ),
+                                  ).then((_) => _loadData());
+                                }
+                              : null,
+                        ),
                       ),
-                    ),
-                  ).then((_) => _loadData());
-                },
-              ),
-            ],
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          icon: const Icon(Icons.timer_outlined, size: 16),
+                          label: const Text('Start Exam', style: TextStyle(fontSize: 12)),
+                          style: FilledButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          onPressed: exam.questions.isNotEmpty
+                              ? () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => TakeExamScreen(
+                                        exams: exams,
+                                        initialExamId: exam.id,
+                                      ),
+                                    ),
+                                  ).then((_) => _loadData());
+                                }
+                              : null,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.file_upload_outlined, size: 14),
+                        label: const Text('Import CSV', style: TextStyle(fontSize: 12)),
+                        onPressed: () => _startImportFlow(exam),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.storage_outlined, size: 14),
+                        label: const Text('Question Bank', style: TextStyle(fontSize: 12)),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => QuestionBankScreen(
+                                exams: exams,
+                                initialExamId: exam.id,
+                              ),
+                            ),
+                          ).then((_) => _loadData());
+                        },
+                      ),
+                    ],
+                  ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -928,9 +1175,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final color = pct >= 80
         ? AppTheme.success
         : (pct >= 60 ? AppTheme.warning : AppTheme.danger);
+    final isMobile = MediaQuery.of(context).size.width < 900;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(isMobile ? 12 : 16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -939,7 +1187,7 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(isMobile ? 8 : 10),
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
@@ -947,34 +1195,42 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               '${pct.round()}%',
               style: TextStyle(
-                  fontWeight: FontWeight.bold, color: color, fontSize: 13),
+                  fontWeight: FontWeight.bold, color: color, fontSize: isMobile ? 12 : 13),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: isMobile ? 10 : 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   perf.examName,
-                  style: const TextStyle(
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 15,
+                      fontSize: isMobile ? 14 : 15,
                       color: AppTheme.text),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   '${perf.correct}/${perf.totalQuestions} correct • ${perf.date.toLocal().toString().split(' ').first}',
-                  style: const TextStyle(
-                      color: AppTheme.secondaryText, fontSize: 13),
+                  style: TextStyle(
+                      color: AppTheme.secondaryText, fontSize: isMobile ? 11 : 13),
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
           OutlinedButton(
             style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding: EdgeInsets.symmetric(
+                horizontal: isMobile ? 10 : 14,
+                vertical: isMobile ? 6 : 8,
+              ),
+              visualDensity: VisualDensity.compact,
             ),
-            child: const Text('Retake', style: TextStyle(fontSize: 13)),
+            child: Text('Retake', style: TextStyle(fontSize: isMobile ? 12 : 13)),
             onPressed: () {
               Navigator.push(
                 context,
@@ -992,6 +1248,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 2. EXAMS SCREEN
   Widget _buildExamsScreen() {
+    final isMobile = MediaQuery.of(context).size.width < 900;
     final query = _searchCtrl.text.trim().toLowerCase();
     var list = exams.where((e) {
       if (query.isEmpty) return true;
@@ -1000,7 +1257,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 28,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -1010,63 +1270,69 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Exams',
-                        style: TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.text),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${exams.length} Certification Tracks Available',
-                        style: const TextStyle(
-                            color: AppTheme.secondaryText, fontSize: 14),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Exams',
+                          style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${exams.length} Tracks Available',
+                          style: const TextStyle(
+                              color: AppTheme.secondaryText, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
                   FilledButton.icon(
-                    icon: const Icon(Icons.add, size: 18),
-                    label: const Text('+ Add Exam'),
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Exam', style: TextStyle(fontSize: 12)),
                     onPressed: _createExamDialog,
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               // Search & Filter Bar
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (_) => setState(() {}),
-                      decoration: const InputDecoration(
-                        hintText: 'Search exams...',
-                        prefixIcon:
-                            Icon(Icons.search, color: AppTheme.secondaryText),
-                      ),
+                  TextField(
+                    controller: _searchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: const InputDecoration(
+                      hintText: 'Search exams...',
+                      prefixIcon:
+                          Icon(Icons.search, color: AppTheme.secondaryText),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Wrap(
-                    spacing: 8,
-                    children: ['All', 'In Progress', 'Not Started', 'Completed']
-                        .map((f) {
-                      final isSel = _examFilter == f;
-                      return ChoiceChip(
-                        label: Text(f),
-                        selected: isSel,
-                        onSelected: (v) => setState(() => _examFilter = f),
-                      );
-                    }).toList(),
+                  const SizedBox(height: 10),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: ['All', 'In Progress', 'Not Started', 'Completed']
+                          .map((f) {
+                        final isSel = _examFilter == f;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ChoiceChip(
+                            label: Text(f, style: const TextStyle(fontSize: 12)),
+                            selected: isSel,
+                            onSelected: (v) => setState(() => _examFilter = f),
+                          ),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 18),
 
               // Exam Cards or Empty State
               if (list.isEmpty)
@@ -1145,8 +1411,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 4. PRACTICE HISTORY
   Widget _buildHistoryScreen() {
+    final isMobile = MediaQuery.of(context).size.width < 900;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+      padding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 16 : 32,
+        vertical: isMobile ? 16 : 28,
+      ),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1000),

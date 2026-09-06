@@ -67,33 +67,82 @@ class ImportPreviewScreen extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const Divider(height: 28),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _DetailItem(
-                          label: 'Questions Found',
-                          value: '${res.validQuestions.length}',
-                          color: theme.colorScheme.primary,
-                        ),
-                        _DetailItem(
-                          label: 'Starting ID',
-                          value: res.validQuestions.isNotEmpty
-                              ? 'Q${res.startQuestionNumber}'
-                              : '—',
-                        ),
-                        _DetailItem(
-                          label: 'Ending ID',
-                          value: res.validQuestions.isNotEmpty
-                              ? 'Q${res.endQuestionNumber}'
-                              : '—',
-                        ),
-                        _DetailItem(
-                          label: 'ID Range',
-                          value: idRange,
-                          highlight: true,
-                        ),
-                      ],
+                    const Divider(height: 24),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (constraints.maxWidth < 450) {
+                          return Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _DetailItem(
+                                      label: 'Questions Found',
+                                      value: '${res.validQuestions.length}',
+                                      color: theme.colorScheme.primary,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _DetailItem(
+                                      label: 'ID Range',
+                                      value: idRange,
+                                      highlight: true,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _DetailItem(
+                                      label: 'Starting ID',
+                                      value: res.validQuestions.isNotEmpty
+                                          ? 'Q${res.startQuestionNumber}'
+                                          : '—',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _DetailItem(
+                                      label: 'Ending ID',
+                                      value: res.validQuestions.isNotEmpty
+                                          ? 'Q${res.endQuestionNumber}'
+                                          : '—',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          );
+                        }
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _DetailItem(
+                              label: 'Questions Found',
+                              value: '${res.validQuestions.length}',
+                              color: theme.colorScheme.primary,
+                            ),
+                            _DetailItem(
+                              label: 'Starting ID',
+                              value: res.validQuestions.isNotEmpty
+                                  ? 'Q${res.startQuestionNumber}'
+                                  : '—',
+                            ),
+                            _DetailItem(
+                              label: 'Ending ID',
+                              value: res.validQuestions.isNotEmpty
+                                  ? 'Q${res.endQuestionNumber}'
+                                  : '—',
+                            ),
+                            _DetailItem(
+                              label: 'ID Range',
+                              value: idRange,
+                              highlight: true,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

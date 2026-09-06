@@ -14,9 +14,14 @@ class ExamPerformance {
   final Map<String, Map<String, int>> topicPerformance;
   final Map<String, Map<String, int>> difficultyPerformance;
 
+  final String? studentId;
+  final String? studentName;
+
   ExamPerformance({
     this.examId = '',
     this.examName = 'Exam',
+    this.studentId,
+    this.studentName,
     DateTime? date,
     int? totalQuestions,
     int? total,
@@ -45,6 +50,8 @@ class ExamPerformance {
   Map<String, dynamic> toJson() => {
         'examId': examId,
         'examName': examName,
+        'studentId': studentId,
+        'studentName': studentName,
         'date': date.toIso8601String(),
         'totalQuestions': totalQuestions,
         'correct': correct,
@@ -88,6 +95,8 @@ class ExamPerformance {
     return ExamPerformance(
       examId: j['examId']?.toString() ?? '',
       examName: j['examName']?.toString() ?? 'Exam',
+      studentId: j['studentId']?.toString(),
+      studentName: j['studentName']?.toString(),
       date: j['date'] != null
           ? (DateTime.tryParse(j['date'].toString()) ?? DateTime.now())
           : DateTime.now(),

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
+import '../models/student_profile.dart';
 
 abstract class IStorageRepository {
   Future<void> init();
@@ -18,6 +19,14 @@ abstract class IStorageRepository {
   Future<Map<String, dynamic>> getSettings();
   Future<void> saveSettings(Map<String, dynamic> settings);
   Future<void> clearAllData();
+
+  // Student Profiles
+  Future<List<StudentProfile>> getAllStudents();
+  Future<StudentProfile?> getStudentById(String id);
+  Future<void> saveStudent(StudentProfile student);
+  Future<void> deleteStudent(String id);
+  Future<String?> getActiveStudentId();
+  Future<void> setActiveStudentId(String id);
 }
 
 class IoStorageRepository implements IStorageRepository {
@@ -195,6 +204,85 @@ class IoStorageRepository implements IStorageRepository {
         } catch (_) {}
       }
     }
+  }
+
+  @override
+  Future<List<StudentProfile>> getAllStudents() async {
+    await init();
+    final file = File('${mcqDir.path}/students.json');
+    if (!await file.exists()) {
+      return [];
+    }
+    try {
+      final text = await file.readAsString();
+      final list = jsonDecode(text) as List<dynamic>;
+      return list
+          .map((item) => StudentProfile.fromJson(item as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  @override
+  Future<StudentProfile?> getStudentById(String id) async {
+    final students = await getAllStudents();
+    try {
+      return students.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveStudent(StudentProfile student) async {
+    await init();
+    final students = await getAllStudents();
+    final index = students.indexWhere((s) => s.id == student.id);
+    if (index >= 0) {
+      students[index] = student;
+    } else {
+      students.add(student);
+    }
+    final file = File('${mcqDir.path}/students.json');
+    await file.writeAsString(
+      jsonEncode(students.map((s) => s.toJson()).toList()),
+    );
+  }
+
+  @override
+  Future<void> deleteStudent(String id) async {
+    await init();
+    final students = await getAllStudents();
+    students.removeWhere((s) => s.id == id);
+    final file = File('${mcqDir.path}/students.json');
+    await file.writeAsString(
+      jsonEncode(students.map((s) => s.toJson()).toList()),
+    );
+
+    final activeId = await getActiveStudentId();
+    if (activeId == id) {
+      if (students.isNotEmpty) {
+        await setActiveStudentId(students.first.id);
+      } else {
+        final settings = await getSettings();
+        settings.remove('activeStudentId');
+        await saveSettings(settings);
+      }
+    }
+  }
+
+  @override
+  Future<String?> getActiveStudentId() async {
+    final settings = await getSettings();
+    return settings['activeStudentId'] as String?;
+  }
+
+  @override
+  Future<void> setActiveStudentId(String id) async {
+    final settings = await getSettings();
+    settings['activeStudentId'] = id;
+    await saveSettings(settings);
   }
 
   Map<String, dynamic> _defaultSettings() => {

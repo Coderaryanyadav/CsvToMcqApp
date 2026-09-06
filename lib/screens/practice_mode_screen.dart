@@ -1,19 +1,26 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../models/performance.dart';
 import '../models/question.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import 'result_screen.dart';
 
 class PracticeModeScreen extends StatefulWidget {
   final List<Question> questions;
   final int durationMin;
+  final String? examId;
   final String? examName;
+  final int passingPercentage;
 
   const PracticeModeScreen({
     super.key,
     required this.questions,
     this.durationMin = 30,
+    this.examId,
     this.examName,
+    this.passingPercentage = 75,
   });
 
   @override
@@ -26,22 +33,32 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
   final Map<int, bool> _revealed = {};
   Timer? _timer;
   late int _remainingSeconds;
+  int _elapsedSeconds = 0;
+  DateTime? _questionStartTime;
+  final Map<String, int> _timeSpent = {};
+  bool _isFinishing = false;
 
   @override
   void initState() {
     super.initState();
     _remainingSeconds = widget.durationMin * 60;
+    _questionStartTime = DateTime.now();
+    for (var q in widget.questions) {
+      _timeSpent[q.id] = 0;
+    }
     _startTimer();
   }
 
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
+      if (!mounted || _isFinishing) {
+        t.cancel();
+        return;
+      }
       setState(() {
+        _elapsedSeconds++;
         if (_remainingSeconds > 0) {
           _remainingSeconds--;
-        } else {
-          _timer?.cancel();
         }
       });
     });
@@ -51,6 +68,15 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
   void dispose() {
     _timer?.cancel();
     super.dispose();
+  }
+
+  void _trackQuestionTime() {
+    if (_questionStartTime != null && current < widget.questions.length) {
+      final qId = widget.questions[current].id;
+      final elapsed = DateTime.now().difference(_questionStartTime!).inSeconds;
+      _timeSpent[qId] = (_timeSpent[qId] ?? 0) + elapsed;
+    }
+    _questionStartTime = DateTime.now();
   }
 
   String _formatTimer(int sec) {
@@ -79,11 +105,113 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
 
   void _navigateToQuestion(int index) {
     if (index >= 0 && index < widget.questions.length) {
+      _trackQuestionTime();
       setState(() {
         current = index;
       });
       HapticFeedback.selectionClick();
     }
+  }
+
+  Future<void> _finishPractice() async {
+    if (_isFinishing) return;
+    _trackQuestionTime();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Finish Practice Session?'),
+        content: const Text(
+          'Your practice results will be saved to your student history and dashboard analytics.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Continue Practice'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Finish & View Results'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    _isFinishing = true;
+    _timer?.cancel();
+
+    int correct = 0;
+    int incorrect = 0;
+    int unanswered = 0;
+    final Map<String, bool> results = {};
+    final Map<String, int> topicTotals = {};
+    final Map<String, int> topicCorrect = {};
+    final Map<String, Set<int>> answersStringKeyed = {};
+
+    for (int i = 0; i < widget.questions.length; i++) {
+      final q = widget.questions[i];
+      final userSelection = _answers[i] ?? <int>{};
+      answersStringKeyed[q.id] = userSelection;
+      final topic = q.topic ?? 'General';
+      topicTotals[topic] = (topicTotals[topic] ?? 0) + 1;
+
+      if (userSelection.isEmpty) {
+        unanswered++;
+        results[q.id] = false;
+      } else if (q.isAnswerCorrect(userSelection)) {
+        correct++;
+        results[q.id] = true;
+        topicCorrect[topic] = (topicCorrect[topic] ?? 0) + 1;
+      } else {
+        incorrect++;
+        results[q.id] = false;
+      }
+    }
+
+    final weak = <String>[];
+    topicTotals.forEach((t, tot) {
+      final c = topicCorrect[t] ?? 0;
+      if ((c / tot) < 0.65) weak.add(t);
+    });
+
+    final activeStudent = await StorageService.getActiveStudent();
+
+    final perf = ExamPerformance(
+      studentId: activeStudent?.id,
+      studentName: activeStudent?.name,
+      examId: widget.examId ?? 'practice_session',
+      examName: '${widget.examName ?? "Practice"} (Practice Mode)',
+      date: DateTime.now(),
+      totalQuestions: widget.questions.length,
+      correct: correct,
+      incorrect: incorrect,
+      unanswered: unanswered,
+      durationSeconds: _elapsedSeconds,
+      timePerQuestion: _timeSpent,
+      questionResults: results,
+      weakTopics: weak,
+      passingPercentage: widget.passingPercentage,
+    );
+
+    await StorageService.savePerformance(perf);
+
+    if (!mounted) return;
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ResultScreen(
+          questions: widget.questions,
+          answers: answersStringKeyed,
+          timePerQuestion: _timeSpent,
+          timeSpentSec: _elapsedSeconds,
+          examName: widget.examName,
+          examId: widget.examId,
+          passingPercentage: widget.passingPercentage,
+        ),
+      ),
+    );
   }
 
   void _showQuestionNavigatorModal() {
@@ -291,7 +419,7 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        q.id,
+                        q.displayId,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -665,7 +793,7 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: AppTheme.border)),
@@ -678,46 +806,46 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
                         ),
-                        icon: const Icon(Icons.arrow_back, size: 18),
+                        icon: const Icon(Icons.arrow_back, size: 16),
                         label: const Text('Previous'),
                         onPressed: current > 0
                             ? () => _navigateToQuestion(current - 1)
                             : null,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                            horizontal: 12, vertical: 12),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10)),
                       ),
-                      icon: const Icon(Icons.grid_view, size: 18),
-                      label: const Text('Navigator'),
+                      icon: const Icon(Icons.grid_view, size: 16),
+                      label: const Text('Grid'),
                       onPressed: _showQuestionNavigatorModal,
                     ),
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: FilledButton.icon(
                         style: FilledButton.styleFrom(
                           backgroundColor: isLast
                               ? AppTheme.accentBlue
                               : AppTheme.primaryNavy,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10)),
                         ),
                         icon: Icon(isLast ? Icons.check : Icons.arrow_forward,
-                            size: 18),
-                        label: Text(isLast ? 'Finish Practice' : 'Next'),
+                            size: 16),
+                        label: Text(isLast ? 'Finish' : 'Next'),
                         onPressed: () {
                           if (isLast) {
-                            Navigator.pop(context);
+                            _finishPractice();
                           } else {
                             _navigateToQuestion(current + 1);
                           }

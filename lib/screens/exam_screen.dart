@@ -159,20 +159,29 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   void _startTimers() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) return;
-      setState(() {
-        if (isUntimed) {
+      if (!mounted || _isFinishing) {
+        t.cancel();
+        return;
+      }
+      if (isUntimed) {
+        setState(() {
           _elapsedSeconds++;
-        } else {
-          if (_remainingSeconds > 0) {
+        });
+      } else {
+        if (_remainingSeconds > 1) {
+          setState(() {
             _remainingSeconds--;
             _elapsedSeconds++;
-          } else {
-            t.cancel();
-            _timeUpAutoSubmit();
-          }
+          });
+        } else {
+          t.cancel();
+          setState(() {
+            _remainingSeconds = 0;
+            _elapsedSeconds++;
+          });
+          _timeUpAutoSubmit();
         }
-      });
+      }
     });
 
     _autosaveTimer?.cancel();
@@ -199,12 +208,18 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
 
   void _timeUpAutoSubmit() {
     if (_isFinishing) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Time is up! Submitting your exam...'),
-        backgroundColor: AppTheme.danger,
-      ),
-    );
+    _isFinishing = true;
+    _timer?.cancel();
+    _autosaveTimer?.cancel();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⏱️ Time is up! Submitting and grading your exam...'),
+          backgroundColor: AppTheme.danger,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
     _submitExam(forced: true);
   }
 
@@ -275,7 +290,11 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       if ((c / tot) < 0.65) weak.add(t);
     });
 
+    final activeStudent = await StorageService.getActiveStudent();
+
     final perf = ExamPerformance(
+      studentId: activeStudent?.id,
+      studentName: activeStudent?.name,
       examId: widget.examId ?? 'custom_exam',
       examName: widget.examName ?? 'Exam Simulation',
       date: DateTime.now(),
@@ -396,10 +415,148 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
+  void _showQuestionNavigatorSheet(BuildContext context, bool isDark) {
+    final answeredCount = widget.questions
+        .where((item) => answers[item.id]?.isNotEmpty ?? false)
+        .length;
+    final totalCount = widget.questions.length;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppTheme.darkSurface : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.65,
+          minChildSize: 0.4,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (_, scrollController) {
+            return Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 10, bottom: 8),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Row(
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Question Navigator',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$answeredCount of $totalCount answered',
+                            style: const TextStyle(fontSize: 13, color: AppTheme.secondaryText),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: GridView.builder(
+                    controller: scrollController,
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 5,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 10,
+                      childAspectRatio: 1.0,
+                    ),
+                    itemCount: totalCount,
+                    itemBuilder: (context, idx) {
+                      final itemQ = widget.questions[idx];
+                      final isAns = answers[itemQ.id]?.isNotEmpty ?? false;
+                      final isCurr = idx == current;
+                      final isMark = marked.contains(itemQ.id);
+
+                      Color bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+                      Color textC = isDark ? Colors.white : AppTheme.text;
+                      BorderSide borderSide = BorderSide.none;
+
+                      if (isCurr) {
+                        borderSide = const BorderSide(color: AppTheme.accentBlue, width: 2);
+                      }
+
+                      if (isAns) {
+                        bg = AppTheme.success.withValues(alpha: 0.18);
+                        textC = AppTheme.success;
+                      }
+
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _navigateToQuestion(idx);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: bg,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: borderSide.color,
+                              width: borderSide.width,
+                            ),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Text(
+                                '${idx + 1}',
+                                style: TextStyle(
+                                  fontWeight: isCurr ? FontWeight.bold : FontWeight.w600,
+                                  color: textC,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              if (isMark)
+                                const Positioned(
+                                  top: 3,
+                                  right: 3,
+                                  child: Icon(Icons.bookmark, size: 12, color: AppTheme.warning),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile = screenWidth < 750;
+
     final q = widget.questions[current];
     final userAns = answers[q.id] ?? <int>{};
     final isBookmarked = marked.contains(q.id);
@@ -444,32 +601,41 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
         },
         child: Scaffold(
           appBar: AppBar(
-            title: Text(widget.examName ?? 'Exam Mode'),
+            title: Text(
+              widget.examName ?? 'Exam Mode',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: isMobile ? 16 : 18),
+            ),
             actions: [
               // Timer Display
               Container(
-                margin: const EdgeInsets.only(right: 12),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                margin: EdgeInsets.only(right: isMobile ? 6 : 12),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 8 : 12,
+                  vertical: 5,
+                ),
                 decoration: BoxDecoration(
                   color: _getTimerColor().withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(
-                      color: _getTimerColor().withValues(alpha: 0.4)),
+                    color: _getTimerColor().withValues(alpha: 0.35),
+                  ),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       isUntimed ? Icons.timelapse : Icons.timer,
                       color: _getTimerColor(),
-                      size: 18,
+                      size: isMobile ? 15 : 17,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
                       _formatTimerText(),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: isMobile ? 12 : 14,
                         color: _getTimerColor(),
                       ),
                     ),
@@ -477,18 +643,31 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                 ),
               ),
 
+              // Mobile Grid Navigator Icon
+              if (isMobile)
+                IconButton(
+                  tooltip: 'Questions Grid',
+                  icon: const Icon(Icons.grid_view_rounded, size: 20),
+                  onPressed: () => _showQuestionNavigatorSheet(context, isDark),
+                ),
+
               // Finish Exam Button
               Padding(
-                padding: const EdgeInsets.only(right: 12),
+                padding: EdgeInsets.only(right: isMobile ? 8 : 12),
                 child: FilledButton(
                   style: FilledButton.styleFrom(
                     backgroundColor: AppTheme.accentBlue,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? 10 : 16,
+                      vertical: 6,
+                    ),
                     visualDensity: VisualDensity.compact,
                   ),
                   onPressed: () => _submitExam(),
-                  child: const Text('Finish Exam'),
+                  child: Text(
+                    isMobile ? 'Finish' : 'Finish Exam',
+                    style: TextStyle(fontSize: isMobile ? 12 : 14),
+                  ),
                 ),
               ),
             ],
@@ -498,8 +677,10 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
               // Main Question Area
               Expanded(
                 child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isMobile ? 16 : 28,
+                    vertical: isMobile ? 16 : 24,
+                  ),
                   child: Center(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 850),
@@ -510,28 +691,34 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                           Row(
                             children: [
                               Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 6),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: isMobile ? 8 : 12,
+                                  vertical: isMobile ? 4 : 6,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryNavy
-                                      .withValues(alpha: 0.08),
+                                  color: AppTheme.primaryNavy.withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   'Question ${current + 1} of $totalCount',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: isMobile ? 12 : 13,
                                   ),
                                 ),
                               ),
                               if (q.topic != null) ...[
                                 const SizedBox(width: 8),
-                                Chip(
-                                  label: Text(q.topic!,
-                                      style: const TextStyle(fontSize: 12)),
-                                  visualDensity: VisualDensity.compact,
-                                  padding: EdgeInsets.zero,
+                                Flexible(
+                                  child: Chip(
+                                    label: Text(
+                                      q.topic!,
+                                      style: TextStyle(fontSize: isMobile ? 11 : 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                  ),
                                 ),
                               ],
                               const Spacer(),
@@ -546,17 +733,18 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                   color: isBookmarked
                                       ? AppTheme.warning
                                       : Colors.grey,
+                                  size: isMobile ? 18 : 22,
                                 ),
                                 onPressed: _toggleBookmark,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 14),
 
                           // Question Text
                           Card(
                             child: Padding(
-                              padding: const EdgeInsets.all(24),
+                              padding: EdgeInsets.all(isMobile ? 16 : 24),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -575,8 +763,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                     ),
                                   Text(
                                     q.question,
-                                    style: const TextStyle(
-                                      fontSize: 17,
+                                    style: TextStyle(
+                                      fontSize: isMobile ? 15 : 17,
                                       fontWeight: FontWeight.w600,
                                       height: 1.45,
                                     ),
@@ -585,23 +773,22 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
 
                           // Options List
                           ...List.generate(q.options.length, (optIdx) {
                             final isSelected = userAns.contains(optIdx);
 
                             return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.only(bottom: 10),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(12),
                                 onTap: () => _selectOption(optIdx),
                                 child: Container(
-                                  padding: const EdgeInsets.all(16),
+                                  padding: EdgeInsets.all(isMobile ? 12 : 16),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppTheme.accentBlue
-                                            .withValues(alpha: 0.08)
+                                        ? AppTheme.accentBlue.withValues(alpha: 0.08)
                                         : (isDark
                                             ? AppTheme.darkSurface
                                             : Colors.white),
@@ -618,8 +805,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                   child: Row(
                                     children: [
                                       Container(
-                                        width: 32,
-                                        height: 32,
+                                        width: isMobile ? 28 : 32,
+                                        height: isMobile ? 28 : 32,
                                         decoration: BoxDecoration(
                                           color: isSelected
                                               ? AppTheme.accentBlue
@@ -638,7 +825,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                             String.fromCharCode(65 + optIdx),
                                             style: TextStyle(
                                               fontWeight: FontWeight.bold,
-                                              fontSize: 14,
+                                              fontSize: isMobile ? 12 : 14,
                                               color: isSelected
                                                   ? Colors.white
                                                   : null,
@@ -646,12 +833,12 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 14),
+                                      const SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           q.options[optIdx],
                                           style: TextStyle(
-                                            fontSize: 15,
+                                            fontSize: isMobile ? 14 : 15,
                                             fontWeight: isSelected
                                                 ? FontWeight.w600
                                                 : FontWeight.normal,
@@ -664,24 +851,23 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                               ),
                             );
                           }),
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 20),
 
                           // Navigation Bottom Buttons
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
-                                icon: const Icon(Icons.arrow_back, size: 18),
-                                label: const Text('Previous'),
+                                icon: Icon(Icons.arrow_back, size: isMobile ? 16 : 18),
+                                label: Text(isMobile ? 'Prev' : 'Previous'),
                                 onPressed: current > 0
                                     ? () => _navigateToQuestion(current - 1)
                                     : null,
                               ),
                               if (current < totalCount - 1)
                                 FilledButton.icon(
-                                  icon:
-                                      const Icon(Icons.arrow_forward, size: 18),
-                                  label: const Text('Next Question'),
+                                  icon: Icon(Icons.arrow_forward, size: isMobile ? 16 : 18),
+                                  label: Text(isMobile ? 'Next' : 'Next Question'),
                                   onPressed: () =>
                                       _navigateToQuestion(current + 1),
                                 )
@@ -702,118 +888,123 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                 ),
               ),
 
-              // Desktop Side Question Grid Navigator
-              Container(
-                width: 280,
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkSurface : Colors.white,
-                  border: Border(
+              // Desktop Side Question Grid Navigator (Hidden on Mobile)
+              if (!isMobile)
+                Container(
+                  width: 280,
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkSurface : Colors.white,
+                    border: Border(
                       left: BorderSide(
-                          color:
-                              isDark ? AppTheme.darkBorder : AppTheme.border)),
-                ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border(
-                            bottom: BorderSide(
-                                color: isDark
-                                    ? AppTheme.darkBorder
-                                    : AppTheme.border)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Question Navigator',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '$answeredCount of $totalCount answered',
-                            style: const TextStyle(
-                                fontSize: 13, color: AppTheme.secondaryText),
-                          ),
-                        ],
+                        color: isDark ? AppTheme.darkBorder : AppTheme.border,
                       ),
                     ),
-                    Expanded(
-                      child: GridView.builder(
+                  ),
+                  child: Column(
+                    children: [
+                      Container(
                         padding: const EdgeInsets.all(16),
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 5,
-                          crossAxisSpacing: 8,
-                          mainAxisSpacing: 8,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.border,
+                            ),
+                          ),
                         ),
-                        itemCount: totalCount,
-                        itemBuilder: (context, idx) {
-                          final itemQ = widget.questions[idx];
-                          final isAns = answers[itemQ.id]?.isNotEmpty ?? false;
-                          final isCurr = idx == current;
-                          final isMark = marked.contains(itemQ.id);
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Question Navigator',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$answeredCount of $totalCount answered',
+                              style: const TextStyle(
+                                  fontSize: 13, color: AppTheme.secondaryText),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 5,
+                            crossAxisSpacing: 8,
+                            mainAxisSpacing: 8,
+                          ),
+                          itemCount: totalCount,
+                          itemBuilder: (context, idx) {
+                            final itemQ = widget.questions[idx];
+                            final isAns =
+                                answers[itemQ.id]?.isNotEmpty ?? false;
+                            final isCurr = idx == current;
+                            final isMark = marked.contains(itemQ.id);
 
-                          Color bg = isDark
-                              ? const Color(0xFF0F172A)
-                              : const Color(0xFFF1F5F9);
-                          Color textC = isDark ? Colors.white : AppTheme.text;
-                          BorderSide borderSide = BorderSide.none;
+                            Color bg = isDark
+                                ? const Color(0xFF0F172A)
+                                : const Color(0xFFF1F5F9);
+                            Color textC = isDark ? Colors.white : AppTheme.text;
+                            BorderSide borderSide = BorderSide.none;
 
-                          if (isCurr) {
-                            borderSide = const BorderSide(
-                                color: AppTheme.accentBlue, width: 2);
-                          }
+                            if (isCurr) {
+                              borderSide = const BorderSide(
+                                  color: AppTheme.accentBlue, width: 2);
+                            }
 
-                          if (isAns) {
-                            bg = AppTheme.success.withValues(alpha: 0.15);
-                            textC = AppTheme.success;
-                          }
+                            if (isAns) {
+                              bg = AppTheme.success.withValues(alpha: 0.15);
+                              textC = AppTheme.success;
+                            }
 
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () => _navigateToQuestion(idx),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: bg,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: borderSide.color,
-                                  width: borderSide.width,
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () => _navigateToQuestion(idx),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: bg,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: borderSide.color,
+                                    width: borderSide.width,
+                                  ),
+                                ),
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    Text(
+                                      '${idx + 1}',
+                                      style: TextStyle(
+                                        fontWeight: isCurr
+                                            ? FontWeight.bold
+                                            : FontWeight.w600,
+                                        color: textC,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if (isMark)
+                                      const Positioned(
+                                        top: 2,
+                                        right: 2,
+                                        child: Icon(Icons.bookmark,
+                                            size: 10, color: AppTheme.warning),
+                                      ),
+                                  ],
                                 ),
                               ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Text(
-                                    '${idx + 1}',
-                                    style: TextStyle(
-                                      fontWeight: isCurr
-                                          ? FontWeight.bold
-                                          : FontWeight.w600,
-                                      color: textC,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  if (isMark)
-                                    const Positioned(
-                                      top: 2,
-                                      right: 2,
-                                      child: Icon(Icons.bookmark,
-                                          size: 10, color: AppTheme.warning),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ),

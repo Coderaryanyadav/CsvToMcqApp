@@ -89,6 +89,47 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     selectedTopic = 'All Topics';
   }
 
+  int get _availableQuestionsCount {
+    if (selectedExam == null) return 0;
+    var list = List<Question>.from(selectedExam!.questions);
+    if (selectedTopic != 'All Topics') {
+      list = list.where((q) => q.topic == selectedTopic).toList();
+    }
+    if (selectedDifficulty != 'Any') {
+      if (selectedDifficulty == 'Easy') {
+        list = list.where((q) => q.difficulty <= 2).toList();
+      } else if (selectedDifficulty == 'Medium') {
+        list = list.where((q) => q.difficulty == 3 || q.difficulty == 4).toList();
+      } else if (selectedDifficulty == 'Hard') {
+        list = list.where((q) => q.difficulty == 5).toList();
+      }
+    }
+    return list.length;
+  }
+
+  int get _effectiveQuestionCount {
+    if (isAllQuestions) return _availableQuestionsCount;
+    if (isCustomCount) {
+      return int.tryParse(_customCountCtrl.text.trim()) ?? selectedQuestionCount;
+    }
+    return selectedQuestionCount;
+  }
+
+  String? get _questionCountError {
+    final available = _availableQuestionsCount;
+    if (available == 0) {
+      return 'No questions available in "${selectedExam?.name ?? 'Exam'}" with current filters.';
+    }
+    final requested = _effectiveQuestionCount;
+    if (requested <= 0) {
+      return 'Please enter a question count greater than 0.';
+    }
+    if (requested > available) {
+      return 'Cannot select $requested questions! Only $available questions exist in this exam track/filter.';
+    }
+    return null;
+  }
+
   List<Question> _getFilteredQuestions() {
     if (selectedExam == null) return [];
     var questions = List<Question>.from(selectedExam!.questions);
@@ -149,6 +190,42 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
   void _startSession() {
     if (selectedExam == null) return;
+    
+    if (isCustomCount) {
+      final val = int.tryParse(_customCountCtrl.text.trim());
+      if (val != null && val > 0) {
+        selectedQuestionCount = val;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid number of questions.'), backgroundColor: AppTheme.danger),
+        );
+        return;
+      }
+    }
+    
+    if (isCustomDuration) {
+      final val = int.tryParse(_customDurationCtrl.text.trim());
+      if (val != null && val >= 0) {
+        selectedDurationMin = val;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Please enter a valid duration in minutes (0 for untimed).'), backgroundColor: AppTheme.danger),
+        );
+        return;
+      }
+    }
+
+    final countError = _questionCountError;
+    if (countError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(countError),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+      return;
+    }
+
     final filtered = _getFilteredQuestions();
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -167,7 +244,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           builder: (_) => PracticeModeScreen(
             questions: filtered,
             durationMin: selectedDurationMin,
+            examId: selectedExam!.id,
             examName: selectedExam!.name,
+            passingPercentage: selectedExam!.passingPercentage,
           ),
         ),
       );
@@ -313,7 +392,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
                 // 3. QUESTIONS COUNT
                 _sectionTitle(
-                    '3. Number of Questions', Icons.format_list_numbered),
+                    '3. Number of Questions (${_availableQuestionsCount} Available)', Icons.format_list_numbered),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -328,9 +407,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               final isSel = !isAllQuestions &&
                                   !isCustomCount &&
                                   selectedQuestionCount == count;
+                              final isOver = count > _availableQuestionsCount;
                               return ChoiceChip(
                                 label: Text('$count Questions'),
                                 selected: isSel,
+                                avatar: isOver
+                                    ? const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange)
+                                    : null,
                                 onSelected: (v) {
                                   if (v) {
                                     setState(() {
@@ -343,7 +426,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               );
                             }),
                             ChoiceChip(
-                              label: Text('All ($totalQuestionsInExam)'),
+                              label: Text('All ($_availableQuestionsCount)'),
                               selected: isAllQuestions,
                               onSelected: (v) {
                                 if (v) {
@@ -351,13 +434,66 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                     isAllQuestions = true;
                                     isCustomCount = false;
                                     selectedQuestionCount =
-                                        totalQuestionsInExam;
+                                        _availableQuestionsCount;
+                                  });
+                                }
+                              },
+                            ),
+                            ChoiceChip(
+                              label: const Text('Custom'),
+                              selected: isCustomCount,
+                              onSelected: (v) {
+                                if (v) {
+                                  setState(() {
+                                    isCustomCount = true;
+                                    isAllQuestions = false;
                                   });
                                 }
                               },
                             ),
                           ],
                         ),
+                        if (isCustomCount)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: TextField(
+                              controller: _customCountCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: InputDecoration(
+                                labelText: 'Custom number of questions (Max: $_availableQuestionsCount)',
+                                hintText: 'Enter a number (1 - $_availableQuestionsCount)',
+                                border: const OutlineInputBorder(),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        if (_questionCountError != null) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.red.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline, size: 20, color: Colors.red.shade700),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _questionCountError!,
+                                    style: TextStyle(
+                                      color: Colors.red.shade900,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -369,26 +505,57 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: _presetDurations.map((duration) {
-                        final isSel = selectedDurationMin == duration;
-                        final label = duration == 0
-                            ? 'Untimed (No Limit)'
-                            : '$duration Minutes';
-                        return ChoiceChip(
-                          label: Text(label),
-                          selected: isSel,
-                          onSelected: (v) {
-                            if (v) {
-                              setState(() {
-                                selectedDurationMin = duration;
-                              });
-                            }
-                          },
-                        );
-                      }).toList(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            ..._presetDurations.map((duration) {
+                              final isSel = !isCustomDuration && selectedDurationMin == duration;
+                              final label = duration == 0
+                                  ? 'Untimed (No Limit)'
+                                  : '$duration Minutes';
+                              return ChoiceChip(
+                                label: Text(label),
+                                selected: isSel,
+                                onSelected: (v) {
+                                  if (v) {
+                                    setState(() {
+                                      isCustomDuration = false;
+                                      selectedDurationMin = duration;
+                                    });
+                                  }
+                                },
+                              );
+                            }),
+                            ChoiceChip(
+                              label: const Text('Custom'),
+                              selected: isCustomDuration,
+                              onSelected: (v) {
+                                if (v) {
+                                  setState(() {
+                                    isCustomDuration = true;
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                        if (isCustomDuration)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: TextField(
+                              controller: _customDurationCtrl,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Custom duration (minutes)',
+                                hintText: 'Enter duration in minutes (0 for untimed)',
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -541,7 +708,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
         decoration: BoxDecoration(
           color: isSelected
               ? AppTheme.accentBlue.withValues(alpha: 0.08)
@@ -561,14 +728,18 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
               children: [
                 Icon(icon,
                     color: isSelected ? AppTheme.accentBlue : Colors.grey,
-                    size: 24),
-                const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: isSelected ? AppTheme.accentBlue : null,
+                    size: 22),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? AppTheme.accentBlue : null,
+                    ),
                   ),
                 ),
               ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
+import 'screens/welcome_screen.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
@@ -7,11 +8,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
   await StorageService.loadSettings();
-  runApp(const MyApp());
+  final activeStudent = await StorageService.getActiveStudent();
+  runApp(MyApp(hasActiveStudent: activeStudent != null));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool hasActiveStudent;
+
+  const MyApp({super.key, this.hasActiveStudent = false});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +24,8 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
-      home: const HomeScreen(),
+      home: hasActiveStudent ? const HomeScreen() : const WelcomeScreen(),
     );
   }
 }
+

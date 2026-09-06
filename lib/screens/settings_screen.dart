@@ -3,9 +3,11 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import '../main.dart';
+import '../models/student_profile.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
 import '../theme/app_theme.dart';
+import 'welcome_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -25,6 +27,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'defaultPassingScore': 75,
   };
   bool loading = true;
+  StudentProfile? activeStudent;
 
   @override
   void initState() {
@@ -34,9 +37,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadSettings() async {
     final loaded = await StorageService.loadSettings();
+    final student = await StorageService.getActiveStudent();
     if (mounted) {
       setState(() {
         settings = loaded;
+        activeStudent = student;
         loading = false;
       });
     }
@@ -182,6 +187,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 0. STUDENT PROFILE SECTION
+                _sectionHeader('Student Profile & Multi-User', Icons.person_outline),
+                Card(
+                  child: ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: (activeStudent != null
+                                ? Color(activeStudent!.avatarColorValue)
+                                : AppTheme.primaryNavy)
+                            .withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          activeStudent?.avatarEmoji ?? '🎓',
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    ),
+                    title: Text(
+                      activeStudent?.name ?? 'No Student Selected',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    subtitle: const Text(
+                      'Switch or create student profiles with separate statistics and history.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    trailing: OutlinedButton(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const WelcomeScreen(isSwitching: true),
+                          ),
+                        );
+                        _loadSettings();
+                      },
+                      child: const Text('Switch'),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
                 // 1. APPEARANCE SECTION
                 _sectionHeader('Appearance', Icons.palette_outlined),
                 Card(

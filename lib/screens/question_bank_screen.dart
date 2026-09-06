@@ -207,7 +207,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                   ? 'Edit Question (${questionToEdit.displayId})'
                   : 'Add New Question (Q${_selectedExam!.nextQuestionNumber})'),
               content: SizedBox(
-                width: 650,
+                width: double.maxFinite,
                 child: SingleChildScrollView(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -592,7 +592,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  q.id,
+                  q.displayId,
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: theme.colorScheme.onPrimaryContainer,
@@ -613,7 +613,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
             ],
           ),
           content: SizedBox(
-            width: 600,
+            width: double.maxFinite,
             child: SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -838,7 +838,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
         children: [
           // Exam Selector Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(
@@ -847,49 +847,52 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
             ),
             child: Row(
               children: [
-                Icon(Icons.school, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                const Text(
-                  'Target Exam: ',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                Icon(Icons.school, color: theme.colorScheme.primary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedExam!.id,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                      items: _exams
+                          .map((e) => DropdownMenuItem(
+                                value: e.id,
+                                child: Text(
+                                  e.name,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ))
+                          .toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _selectedExam = _exams.firstWhere((e) => e.id == val);
+                            _selectedTopic = 'All Topics';
+                          });
+                        }
+                      },
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 8),
-                DropdownButton<String>(
-                  value: _selectedExam!.id,
-                  underline: const SizedBox(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                  items: _exams
-                      .map((e) => DropdownMenuItem(
-                            value: e.id,
-                            child: Text(e.name),
-                          ))
-                      .toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedExam = _exams.firstWhere((e) => e.id == val);
-                        _selectedTopic = 'All Topics';
-                      });
-                    }
-                  },
-                ),
-                const Spacer(),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(
-                    '${_selectedExam!.questions.length} Questions',
+                    '${_selectedExam!.questions.length} Qs',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onPrimaryContainer,
-                      fontSize: 13,
+                      fontSize: 11,
                     ),
                   ),
                 ),
@@ -1047,13 +1050,16 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       ],
                     ),
                   )
-                : ListView.separated(
+                  : ListView.separated(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: questions.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final q = questions[index];
+                      final displayLabel = q.displayNumber != null
+                          ? 'Q${q.displayNumber}'
+                          : 'Q${index + 1}';
                       return Card(
                         elevation: 0,
                         shape: RoundedRectangleBorder(
@@ -1063,142 +1069,167 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
-                          child: Row(
+                          child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // Question ID Badge
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.primaryContainer,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  q.id,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: theme.colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              // Question Content & Meta
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      q.question,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
+                              // Top Bar: Question Badge + Type + Action Buttons
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: theme.colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      displayLabel,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 12,
+                                        color:
+                                            theme.colorScheme.onPrimaryContainer,
                                       ),
                                     ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 6,
-                                      runSpacing: 4,
-                                      children: [
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: q.isMultiple
-                                                ? Colors.purple.shade50
-                                                : Colors.blue.shade50,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                            border: Border.all(
-                                              color: q.isMultiple
-                                                  ? Colors.purple.shade200
-                                                  : Colors.blue.shade200,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            q.isMultiple
-                                                ? 'Multiple Select'
-                                                : 'Single Select',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w500,
-                                              color: q.isMultiple
-                                                  ? Colors.purple.shade900
-                                                  : Colors.blue.shade900,
-                                            ),
-                                          ),
-                                        ),
-                                        if (q.topic != null &&
-                                            q.topic!.isNotEmpty)
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: Colors.grey.shade100,
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                            ),
-                                            child: Text(
-                                              q.topic!,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: Colors.grey.shade800,
-                                              ),
-                                            ),
-                                          ),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                              horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.orange.shade50,
-                                            borderRadius:
-                                                BorderRadius.circular(4),
-                                          ),
-                                          child: Text(
-                                            'Diff: ${q.difficulty}/5',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.orange.shade900,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Action Buttons
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    icon: const Icon(Icons.copy_outlined,
-                                        size: 19),
-                                    tooltip: 'Duplicate Question',
-                                    onPressed: () => _duplicateQuestion(q),
                                   ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: q.isMultiple
+                                          ? Colors.purple.shade50
+                                          : Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: q.isMultiple
+                                            ? Colors.purple.shade200
+                                            : Colors.blue.shade200,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      q.isMultiple ? 'Multiple' : 'Single',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: q.isMultiple
+                                            ? Colors.purple.shade900
+                                            : Colors.blue.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  // Action Icons
                                   IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                     icon: const Icon(Icons.visibility_outlined,
-                                        size: 20),
+                                        size: 19),
                                     tooltip: 'View Details',
                                     onPressed: () =>
                                         _showQuestionDetailsDialog(q),
                                   ),
+                                  const SizedBox(width: 8),
                                   IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: const Icon(Icons.copy_outlined,
+                                        size: 18),
+                                    tooltip: 'Duplicate Question',
+                                    onPressed: () => _duplicateQuestion(q),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                     icon: const Icon(Icons.edit_outlined,
-                                        size: 20),
+                                        size: 19),
                                     tooltip: 'Edit',
                                     onPressed: () =>
                                         _showAddEditQuestionDialog(q),
                                   ),
+                                  const SizedBox(width: 8),
                                   IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
                                     icon: const Icon(Icons.delete_outline,
-                                        size: 20, color: Colors.red),
+                                        size: 19, color: Colors.red),
                                     tooltip: 'Delete',
                                     onPressed: () => _deleteQuestion(q),
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // Question Text
+                              Text(
+                                q.question,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              // Tags / Details Wrap
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  if (q.topic != null &&
+                                      q.topic!.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        q.topic!,
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade800,
+                                        ),
+                                      ),
+                                    ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange.shade50,
+                                      borderRadius:
+                                        BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'Diff: ${q.difficulty}/5',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange.shade900,
+                                      ),
+                                    ),
+                                  ),
+                                  ...q.tags.map((t) => Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blueGrey.shade50,
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          '#$t',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: Colors.blueGrey.shade800,
+                                          ),
+                                        ),
+                                      )),
                                 ],
                               ),
                             ],

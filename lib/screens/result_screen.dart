@@ -503,6 +503,7 @@ class _ResultScreenState extends State<ResultScreen>
             ...List.generate(q.options.length, (optIdx) {
               final isUserPick = userSelection.contains(optIdx);
               final isRightAnswer = q.correctAnswers.contains(optIdx);
+              final exp = q.getExplanation(optIdx);
 
               Color optBg = Colors.transparent;
               Color optBorder = isDark ? AppTheme.darkBorder : AppTheme.border;
@@ -529,62 +530,74 @@ class _ResultScreenState extends State<ResultScreen>
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: optBorder),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (optIcon != null) ...[
-                      Icon(optIcon, color: iconColor, size: 18),
-                      const SizedBox(width: 10),
-                    ] else ...[
-                      Text(
-                        '${String.fromCharCode(65 + optIdx)}.',
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    Expanded(
-                      child: Text(
-                        q.options[optIdx],
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: (isRightAnswer || isUserPick)
-                              ? FontWeight.w600
-                              : FontWeight.normal,
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (optIcon != null) ...[
+                          Icon(optIcon, color: iconColor, size: 18),
+                          const SizedBox(width: 10),
+                        ] else ...[
+                          Text(
+                            '${String.fromCharCode(65 + optIdx)}.',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          const SizedBox(width: 10),
+                        ],
+                        Expanded(
+                          child: Text(
+                            q.options[optIdx],
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: (isRightAnswer || isUserPick)
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
                         ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : (isRightAnswer ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isRightAnswer ? '✅ Correct: ' : '❌ Incorrect: ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              color: isDark ? Colors.white70 : (isRightAnswer ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)),
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              exp != null && exp.isNotEmpty
+                                  ? exp
+                                  : (isRightAnswer
+                                      ? 'This is a correct answer for this question.'
+                                      : 'This option is incorrect.'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.white70 : (isRightAnswer ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               );
             }),
-
-            // Explanation Section
-            if (q.explanation != null && q.explanation!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? const Color(0xFF0F172A)
-                      : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.lightbulb_outline,
-                        size: 18, color: AppTheme.accentBlue),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Explanation: ${q.explanation}',
-                        style: const TextStyle(fontSize: 13, height: 1.4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
         ),
       ),

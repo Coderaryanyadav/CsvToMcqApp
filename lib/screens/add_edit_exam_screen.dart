@@ -302,17 +302,32 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
         title: Text(exam.name),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'Rename exam',
+            icon: const Icon(Icons.settings),
+            tooltip: 'Exam Settings',
             onPressed: () async {
-              final ctrl = TextEditingController(text: exam.name);
+              final pctCtrl = TextEditingController(text: exam.passingPercentage.toString());
+              final nameCtrl = TextEditingController(text: exam.name);
               final ok = await showDialog<bool>(
                 context: context,
                 builder: (ctx) => AlertDialog(
-                  title: const Text('Rename Exam'),
-                  content: TextField(
-                    controller: ctrl,
-                    decoration: const InputDecoration(labelText: 'Exam name'),
+                  title: const Text('Exam Settings'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: nameCtrl,
+                        decoration: const InputDecoration(labelText: 'Exam name'),
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: pctCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Passing Percentage',
+                          hintText: 'e.g. 75',
+                        ),
+                      ),
+                    ],
                   ),
                   actions: [
                     TextButton(
@@ -327,11 +342,20 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
                 ),
               );
               if (ok == true) {
-                setState(() {
-                  exam.name =
-                      ctrl.text.trim().isEmpty ? exam.name : ctrl.text.trim();
-                });
-                await _save();
+                final newPct = int.tryParse(pctCtrl.text.trim());
+                if (newPct != null && newPct >= 1 && newPct <= 100) {
+                  setState(() {
+                    exam.passingPercentage = newPct;
+                    exam.name = nameCtrl.text.trim().isEmpty ? exam.name : nameCtrl.text.trim();
+                  });
+                  await _save();
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Passing percentage must be between 1 and 100.')),
+                    );
+                  }
+                }
               }
             },
           ),

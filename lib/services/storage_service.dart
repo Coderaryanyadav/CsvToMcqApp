@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
 import '../models/exam.dart';
+import '../models/question.dart';
 import '../models/performance.dart';
+import '../models/student_profile.dart';
 import '../repositories/storage_repository.dart';
 
 class StorageService {
@@ -20,6 +22,41 @@ class StorageService {
       return (_repo as IoStorageRepository).appDir;
     }
     return Directory.current;
+  }
+
+  // Student Profiles
+  static Future<List<StudentProfile>> getAllStudents() async {
+    return _repo.getAllStudents();
+  }
+
+  static Future<StudentProfile?> getStudent(String id) async {
+    return _repo.getStudentById(id);
+  }
+
+  static Future<void> saveStudent(StudentProfile student) async {
+    await _repo.saveStudent(student);
+  }
+
+  static Future<void> deleteStudent(String id) async {
+    await _repo.deleteStudent(id);
+  }
+
+  static Future<StudentProfile?> getActiveStudent() async {
+    final activeId = await _repo.getActiveStudentId();
+    if (activeId == null) return null;
+    return _repo.getStudentById(activeId);
+  }
+
+  static Future<void> setActiveStudent(StudentProfile student) async {
+    await _repo.saveStudent(student);
+    await _repo.setActiveStudentId(student.id);
+  }
+
+  static Future<List<ExamPerformance>> loadPerformancesForActiveStudent() async {
+    final all = await loadAllPerformancesAsync();
+    final activeStudent = await getActiveStudent();
+    if (activeStudent == null) return all;
+    return all.where((p) => p.studentId == null || p.studentId == activeStudent.id).toList();
   }
 
   static Future<List<Exam>> loadAllExams() async {
@@ -96,5 +133,9 @@ class StorageService {
 
   static Future<void> clearAllData() async {
     await _repo.clearAllData();
+  }
+
+  static Future<void> seedStarterDataIfEmpty() async {
+    // 100% dynamic database-driven: no hardcoded mock exams
   }
 }

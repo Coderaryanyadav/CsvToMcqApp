@@ -33,9 +33,12 @@ class Question {
                 : {});
 
   // Display label for UI (e.g., "Q1" or "Question 1")
-  String get displayId => displayNumber != null
-      ? 'Q$displayNumber'
-      : (id.startsWith('Q') && id.length <= 6 ? id : 'Q');
+  String get displayId {
+    if (displayNumber != null) return 'Q$displayNumber';
+    if (id.startsWith('Q') && id.length <= 6) return id;
+    if (id.length <= 6) return id;
+    return 'Q';
+  }
 
   // Legacy convenience getter/setter
   int get correct => correctAnswers.isNotEmpty ? correctAnswers.first : 0;
