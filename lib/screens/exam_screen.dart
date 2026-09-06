@@ -1,18 +1,18 @@
-wimport 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/performance.dart';
 import '../models/question.dart';
+import '../theme/app_theme.dart';
 import 'result_screen.dart';
 import '../services/storage_service.dart';
-
-// ignore_for_file: use_build_context_synchronously, deprecated_member_use
 
 class ExamScreen extends StatefulWidget {
   final List<Question> questions;
   final int durationMin;
   final String? examId;
   final String? examName;
+
   const ExamScreen({
     super.key,
     required this.questions,
@@ -28,15 +28,13 @@ class ExamScreen extends StatefulWidget {
 class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   Timer? _timer;
   late int remainingSeconds;
-  DateTime? _pauseTime;
   int current = 0;
-  Map<String, int?> answers = {};
-  Set<String> marked = {};
+  final Map<String, Set<int>> answers = {};
+  final Set<String> marked = {};
   Timer? _autosaveTimer;
   DateTime? _questionStartTime;
   final Map<String, int> _timeSpent = {};
   DateTime _examStartTime = DateTime.now();
-  bool navigatorCollapsed = false;
   bool _isFinishing = false;
 
   @override
@@ -45,15 +43,12 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     remainingSeconds = widget.durationMin * 60;
     for (var q in widget.questions) {
-      answers[q.id] = null;
+      answers[q.id] = <int>{};
       _timeSpent[q.id] = 0;
     }
     _questionStartTime = DateTime.now();
     _examStartTime = DateTime.now();
-    _tryResumeSession().then((_) {
-      if (!mounted) return;
-      _startTimers();
-    });
+    _tryResumeSession();
   }
 
   void _trackQuestionTime() {
@@ -76,80 +71,127 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _tryResumeSession() async {
-    if (widget.examId == null) return;
-    final session = await StorageService.readSession(widget.examId!);
-    if (session == null) return;
-    final resume = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Resume previous session?'),
-        content: const Text(
-          'A saved session was found for this exam. Do you want to resume where you left off?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('No'),
+    if (widget.examId != null) {
+      final session = await StorageService.readSession(widget.examId!);
+      if (session != null && mounted) {
+        final resume = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Resume previous session?'),
+            content: const Text(
+              'A saved session was found for this exam. Do you want to resume where you left off?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('No, Start Fresh'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Resume'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted) return;
-    if (resume == true) {
-      try {
-        remainingSeconds = session['remainingSeconds'] ?? remainingSeconds;
-        current = session['current'] ?? current;
-        final Map m = session['answers'] ?? {};
-        answers = m.map(
-          (k, v) => MapEntry(k as String, v == null ? null : (v as int)),
         );
-        final lm = session['marked'] as List?;
-        if (lm != null) marked = Set.from(lm.map((e) => e.toString()));
-        final tm = session['timeSpent'] as Map?;
-        if (tm != null) {
-          tm.forEach((k, v) {
-            if (v != null) _timeSpent[k.toString()] = v as int;
-          });
+        if (resume == true && mounted) {
+          try {
+            final savedAnswers = (session['answers'] as Map<String, dynamic>?)?.map(
+              (k, v) {
+                if (v is List) {
+                  return MapEntry(k, v.map((e) => (e as num).toInt()).toSet());
+                } else if (v is int) {
+                  return MapEntry(k, {v});
+                }
+                return MapEntry(k, <int>{});
+              },
+            );
+            final savedIndex = session['currentIndex'] as int?;
+            final savedRem = session['remainingSeconds'] as int?;
+
+            setState(() {
+              if (savedAnswers != null) {
+                for (var entry in savedAnswers.entries) {
+                  if (answers.containsKey(entry.key)) {
+                    answers[entry.key] = entry.value;
+                  }
+                }
+              }
+              if (savedIndex != null && savedIndex < widget.questions.length) {
+                current = savedIndex;
+              }
+              if (savedRem != null && savedRem > 0) {
+                remainingSeconds = savedRem;
+              }
+            });
+          } catch (_) {}
         }
-        final startTime = session['examStartTime'] as int?;
-        if (startTime != null) {
-          _examStartTime = DateTime.fromMillisecondsSinceEpoch(startTime);
-        }
-        setState(() {});
-      } catch (e) {
-        // ignore parse errors
       }
-    } else {
-      await StorageService.clearSession(widget.examId!);
+    }
+    if (mounted) {
+      _startTimers();
     }
   }
 
   void _startTimers() {
+    _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      setState(() => remainingSeconds--);
-      if (remainingSeconds <= 0) {
-        finishExam();
-      }
+      if (!mounted) return;
+      setState(() {
+        if (remainingSeconds > 0) {
+          remainingSeconds--;
+        } else {
+          t.cancel();
+          _timeUpAutoSubmit();
+        }
+      });
     });
-    _autosaveTimer =
-        Timer.periodic(const Duration(seconds: 5), (_) => _autosave());
+
+    _autosaveTimer?.cancel();
+    _autosaveTimer = Timer.periodic(const Duration(seconds: 5), (_) => _saveSession());
   }
 
-  void _autosave() async {
+  void _timeUpAutoSubmit() {
+    if (_isFinishing) return;
+    _isFinishing = true;
+    _trackQuestionTime();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('⏰ Time is up!'),
+        content: const Text(
+          'Your time has expired. Your exam will now be automatically submitted.',
+        ),
+        actions: [
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _submitExam(forced: true);
+            },
+            child: const Text('View Results'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveSession() async {
     if (widget.examId == null) return;
-    final session = {
+    final map = <String, dynamic>{
+      'currentIndex': current,
       'remainingSeconds': remainingSeconds,
-      'current': current,
-      'answers': answers,
+      'answers': answers.map((k, v) => MapEntry(k, v.toList())),
       'marked': marked.toList(),
-      'timeSpent': _timeSpent,
-      'examStartTime': _examStartTime.millisecondsSinceEpoch,
+      'timestamp': DateTime.now().toIso8601String(),
     };
-    await StorageService.saveSession(widget.examId!, session);
+    await StorageService.saveSession(widget.examId!, map);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _saveSession();
+    }
   }
 
   @override
@@ -160,112 +202,145 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _pauseTime = DateTime.now();
-    } else if (state == AppLifecycleState.resumed) {
-      if (_pauseTime != null) {
-        final elapsed = DateTime.now().difference(_pauseTime!).inSeconds;
-        setState(() {
-          remainingSeconds -= elapsed;
-          if (remainingSeconds < 0) remainingSeconds = 0;
-        });
-        _pauseTime = null;
-      }
-    }
+  String _formatTimer(int sec) {
+    final m = (sec ~/ 60).toString().padLeft(2, '0');
+    final s = (sec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
-  void selectAnswer(int idx) {
-    final qid = widget.questions[current].id;
-    answers[qid] = idx;
-    setState(() {});
+  void _toggleOption(int index, bool isMultiple) {
     HapticFeedback.lightImpact();
-  }
-
-  void toggleMark() {
-    final qid = widget.questions[current].id;
     setState(() {
-      if (marked.contains(qid)) {
-        marked.remove(qid);
+      final qId = widget.questions[current].id;
+      final currentSet = answers[qId] ?? <int>{};
+      if (isMultiple) {
+        if (currentSet.contains(index)) {
+          currentSet.remove(index);
+        } else {
+          currentSet.add(index);
+        }
+        answers[qId] = currentSet;
       } else {
-        marked.add(qid);
+        answers[qId] = {index};
       }
     });
-    HapticFeedback.mediumImpact();
   }
 
-  void _showFinishDialog() {
-    final answeredCount = answers.values.where((a) => a != null).length;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Finish Exam?'),
-        content: Text(
-          'You have answered $answeredCount out of ${widget.questions.length} questions.\n\nAre you sure you want to finish?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              finishExam();
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            child: const Text('Finish'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void finishExam() async {
-    if (_isFinishing) return;
-    _isFinishing = true;
+  void _confirmSubmit() {
     _trackQuestionTime();
+    final unansweredCount = widget.questions.where((q) {
+      final a = answers[q.id];
+      return a == null || a.isEmpty;
+    }).length;
+
+    if (unansweredCount > 0) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Unanswered Questions'),
+          content: Text(
+            'You still have $unansweredCount unanswered question${unansweredCount > 1 ? 's' : ''}. Are you sure you want to submit?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Continue Exam'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+              onPressed: () {
+                Navigator.pop(ctx);
+                _submitExam();
+              },
+              child: const Text('Submit Exam'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Submit Exam?'),
+          content: const Text('Are you ready to submit your exam and view your score?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                _submitExam();
+              },
+              child: const Text('Submit Exam'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
+  Future<void> _submitExam({bool forced = false}) async {
+    _isFinishing = true;
     _timer?.cancel();
     _autosaveTimer?.cancel();
-
-    int correct = 0;
-    int incorrect = 0;
-    int unanswered = 0;
-    final questionResults = <String, bool>{};
-    for (var q in widget.questions) {
-      final answer = answers[q.id];
-      if (answer == null) {
-        unanswered++;
-      } else if (answer == q.correct) {
-        correct++;
-        questionResults[q.id] = true;
-      } else {
-        incorrect++;
-        questionResults[q.id] = false;
-      }
-    }
-    final duration = DateTime.now().difference(_examStartTime).inSeconds;
-
-    if (widget.examId != null && widget.examName != null) {
-      final performance = ExamPerformance(
-        examId: widget.examId!,
-        examName: widget.examName!,
-        date: DateTime.now(),
-        totalQuestions: widget.questions.length,
-        correct: correct,
-        incorrect: incorrect,
-        unanswered: unanswered,
-        durationSeconds: duration,
-        timePerQuestion: _timeSpent,
-        questionResults: questionResults,
-      );
-      await StorageService.savePerformance(performance);
-    }
+    _trackQuestionTime();
 
     if (widget.examId != null) {
       await StorageService.clearSession(widget.examId!);
     }
+
+    final totalElapsedSeconds = DateTime.now().difference(_examStartTime).inSeconds;
+
+    // Grade each question: exact set match
+    int correctCount = 0;
+    int incorrectCount = 0;
+    int unansweredCount = 0;
+    final Map<String, dynamic> breakdown = {};
+
+    for (var q in widget.questions) {
+      final userAnswers = answers[q.id] ?? <int>{};
+      final isCorrect = q.isAnswerCorrect(userAnswers);
+      final isUnanswered = userAnswers.isEmpty;
+
+      if (isUnanswered) {
+        unansweredCount++;
+      } else if (isCorrect) {
+        correctCount++;
+      } else {
+        incorrectCount++;
+      }
+
+      breakdown[q.id] = {
+        'selected': userAnswers.toList(),
+        'correctAnswers': q.correctAnswers.toList(),
+        'isCorrect': isCorrect,
+        'isUnanswered': isUnanswered,
+        'timeSpent': _timeSpent[q.id] ?? 0,
+      };
+    }
+
+    final perf = ExamPerformance(
+      examId: widget.examId ?? 'unknown',
+      examName: widget.examName ?? 'Exam',
+      date: DateTime.now(),
+      totalQuestions: widget.questions.length,
+      correct: correctCount,
+      incorrect: incorrectCount,
+      unanswered: unansweredCount,
+      durationSeconds: totalElapsedSeconds,
+      timePerQuestion: _timeSpent,
+      questionResults: {
+        for (var q in widget.questions)
+          q.id: q.isAnswerCorrect(answers[q.id] ?? <int>{})
+      },
+    );
+
+    if (widget.examId != null) {
+      await StorageService.savePerformance(perf);
+    }
+
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
@@ -273,20 +348,172 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
         builder: (_) => ResultScreen(
           questions: widget.questions,
           answers: answers,
+          timeSpentSec: totalElapsedSeconds,
           timePerQuestion: _timeSpent,
+          examName: widget.examName,
+          examId: widget.examId,
         ),
       ),
     );
   }
 
+  void _showQuestionNavigatorModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(context).size.height * 0.75,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Question Navigator',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    // Legend
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 8,
+                      children: [
+                        _buildLegendItem(AppTheme.primaryNavy, Colors.white, 'Current'),
+                        _buildLegendItem(const Color(0xFFDBEAFE), AppTheme.primaryNavy, 'Answered'),
+                        _buildLegendItem(Colors.white, AppTheme.secondaryText, 'Unanswered', isBordered: true),
+                        _buildLegendItem(const Color(0xFFFEF3C7), AppTheme.warning, 'Flagged'),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Expanded(
+                      child: GridView.builder(
+                        itemCount: widget.questions.length,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.2,
+                        ),
+                        itemBuilder: (_, i) {
+                          final q = widget.questions[i];
+                          final isCur = i == current;
+                          final isAns = (answers[q.id]?.isNotEmpty ?? false);
+                          final isFlg = marked.contains(q.id);
+
+                          Color bg = Colors.white;
+                          Color fg = AppTheme.text;
+                          Border? border = Border.all(color: AppTheme.border);
+
+                          if (isCur) {
+                            bg = AppTheme.primaryNavy;
+                            fg = Colors.white;
+                            border = null;
+                          } else if (isFlg) {
+                            bg = const Color(0xFFFEF3C7);
+                            fg = const Color(0xFFB45309);
+                            border = Border.all(color: const Color(0xFFFCD34D));
+                          } else if (isAns) {
+                            bg = const Color(0xFFDBEAFE);
+                            fg = AppTheme.primaryNavy;
+                            border = Border.all(color: const Color(0xFF93C5FD));
+                          }
+
+                          return InkWell(
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              _navigateToQuestion(i);
+                            },
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: bg,
+                                borderRadius: BorderRadius.circular(8),
+                                border: border,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: fg,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLegendItem(Color bg, Color fg, String label, {bool isBordered = false}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 14,
+          height: 14,
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(4),
+            border: isBordered ? Border.all(color: AppTheme.border) : null,
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 12, color: AppTheme.secondaryText, fontWeight: FontWeight.w500),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (widget.questions.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Exam Mode')),
+        body: const Center(child: Text('No questions available.')),
+      );
+    }
+
     final q = widget.questions[current];
-    final mins = remainingSeconds ~/ 60;
-    final secs = remainingSeconds % 60;
+    final isLast = current == widget.questions.length - 1;
+    final isMultiple = q.isMultiple;
+    final selected = answers[q.id] ?? <int>{};
+    final questionsLeft = widget.questions.length - current - 1;
+    final isFlagged = marked.contains(q.id);
     final progress = (current + 1) / widget.questions.length;
-    final answeredCount = answers.values.where((a) => a != null).length;
-    final isLastQuestion = current == widget.questions.length - 1;
 
     return PopScope(
       canPop: false,
@@ -296,483 +523,414 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Leave Exam?'),
-            content: const Text('Your progress has been saved.'),
+            content: const Text('Your exam session progress will be saved.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Stay'),
+                child: const Text('Stay in Exam'),
               ),
-              ElevatedButton(
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
                 onPressed: () => Navigator.pop(ctx, true),
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
                 child: const Text('Leave Exam'),
               ),
             ],
           ),
         );
-        if (shouldPop ?? false) {
-          if (!mounted) return;
+        if (shouldPop == true && context.mounted) {
           Navigator.pop(context);
         }
       },
       child: Scaffold(
-        backgroundColor: Colors.grey.shade50,
+        backgroundColor: AppTheme.background,
         appBar: AppBar(
-          backgroundColor: Colors.deepPurple,
-          elevation: 0,
-        title: Text(
-          'Question ${current + 1} of ${widget.questions.length}',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 18,
-          ),
+          title: Text(widget.examName != null ? widget.examName! : 'Exam Mode'),
+          actions: [
+            IconButton(
+              icon: Icon(
+                isFlagged ? Icons.bookmark : Icons.bookmark_border,
+                color: isFlagged ? AppTheme.warning : AppTheme.secondaryText,
+              ),
+              tooltip: 'Flag Question',
+              onPressed: () {
+                setState(() {
+                  if (isFlagged) {
+                    marked.remove(q.id);
+                  } else {
+                    marked.add(q.id);
+                  }
+                });
+              },
+            ),
+          ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Pause/Resume',
-            icon: Icon(
-              _timer == null ? Icons.play_arrow : Icons.pause,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              if (_timer == null) {
-                _startTimers();
-              } else {
-                _timer?.cancel();
-                _timer = null;
-              }
-            },
-          ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: remainingSeconds < 60
-                  ? Colors.red.shade700
-                  : Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: Text(
-                "${mins.toString().padLeft(2, '0')}:${secs.toString().padLeft(2, '0')}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-      body: GestureDetector(
-        onHorizontalDragEnd: (details) {
-          if (details.primaryVelocity != null) {
-            if (details.primaryVelocity! > 0) {
-              _navigateToQuestion(current - 1);
-            } else if (details.primaryVelocity! < 0) {
-              if (!isLastQuestion) {
-                _navigateToQuestion(current + 1);
-              } else {
-                _showFinishDialog();
-              }
-            }
-          }
-        },
-        child: Column(
+        body: Column(
           children: [
-            SizedBox(
-              height: 4,
-              child: LinearProgressIndicator(
-                value: progress,
-                backgroundColor: Colors.grey.shade300,
-                valueColor:
-                    const AlwaysStoppedAnimation<Color>(Colors.deepPurple),
+            // Top Sticky Header
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Question ID
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryNavy,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          q.id,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      // Countdown Timer
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: remainingSeconds < 120
+                              ? const Color(0xFFFEE2E2)
+                              : const Color(0xFFEBF2FA),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.timer_outlined,
+                              size: 15,
+                              color: remainingSeconds < 120 ? AppTheme.danger : AppTheme.primaryNavy,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatTimer(remainingSeconds),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: remainingSeconds < 120 ? AppTheme.danger : AppTheme.primaryNavy,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Questions Left
+                      Text(
+                        '$questionsLeft Left',
+                        style: const TextStyle(
+                          color: AppTheme.secondaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      // Mode Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Exam Mode',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.secondaryText,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: AppTheme.border,
+                      valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.accentBlue),
+                    ),
+                  ),
+                ],
               ),
             ),
+
+            // Question Content (Scrollable)
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Question Card
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: AppTheme.border),
                           ),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 6,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: isMultiple
+                                            ? const Color(0xFFF3E8FF)
+                                            : const Color(0xFFDBEAFE),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        isMultiple ? 'MULTIPLE SELECT' : 'SINGLE SELECT',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: isMultiple
+                                              ? const Color(0xFF6B21A8)
+                                              : AppTheme.accentBlue,
+                                        ),
+                                      ),
+                                    ),
+                                    if (q.topic != null && q.topic!.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          q.topic!,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.secondaryText,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    Text(
+                                      'Question ${current + 1} of ${widget.questions.length}',
+                                      style: const TextStyle(
+                                        color: AppTheme.secondaryText,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                decoration: BoxDecoration(
-                                  color: Colors.deepPurple.shade100,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  'Q${current + 1}',
-                                  style: TextStyle(
-                                    color: Colors.deepPurple.shade900,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
+                                if (isMultiple) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Select all that apply.',
+                                    style: TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                      color: AppTheme.accentBlue,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                Text(
+                                  '${q.id}. ${q.question}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.text,
+                                    height: 1.45,
                                   ),
                                 ),
-                              ),
-                              const Spacer(),
-                              if (marked.contains(q.id))
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Options Cards
+                        ...List.generate(q.options.length, (i) {
+                          final isOptionSelected = selected.contains(i);
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: () => _toggleOption(i, isMultiple),
+                                borderRadius: BorderRadius.circular(12),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 150),
+                                  padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange.shade100,
+                                    color: isOptionSelected
+                                        ? const Color(0xFFEBF2FA)
+                                        : Colors.white,
                                     borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: isOptionSelected
+                                          ? AppTheme.accentBlue
+                                          : AppTheme.border,
+                                      width: isOptionSelected ? 2 : 1,
+                                    ),
                                   ),
                                   child: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Icon(
-                                        Icons.bookmark,
-                                        size: 16,
-                                        color: Colors.orange.shade900,
-                                      ),
-                                      const SizedBox(width: 4),
+                                      if (isMultiple)
+                                        Icon(
+                                          isOptionSelected
+                                              ? Icons.check_box
+                                              : Icons.check_box_outline_blank,
+                                          color: isOptionSelected
+                                              ? AppTheme.accentBlue
+                                              : AppTheme.secondaryText,
+                                          size: 22,
+                                        )
+                                      else
+                                        Icon(
+                                          isOptionSelected
+                                              ? Icons.radio_button_checked
+                                              : Icons.radio_button_unchecked,
+                                          color: isOptionSelected
+                                              ? AppTheme.accentBlue
+                                              : AppTheme.secondaryText,
+                                          size: 22,
+                                        ),
+                                      const SizedBox(width: 12),
                                       Text(
-                                        'Marked',
+                                        '${String.fromCharCode(65 + i)} — ',
                                         style: TextStyle(
-                                          color: Colors.orange.shade900,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: isOptionSelected
+                                              ? AppTheme.accentBlue
+                                              : AppTheme.text,
+                                        ),
+                                      ),
+                                      Expanded(
+                                        child: Text(
+                                          q.options[i],
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: isOptionSelected
+                                                ? FontWeight.w600
+                                                : FontWeight.normal,
+                                            color: AppTheme.text,
+                                          ),
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            q.question,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              height: 1.5,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    ...List.generate(4, (i) {
-                      final sel = answers[q.id];
-                      final isSelected = sel == i;
-                      return Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: () => selectAnswer(i),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? Colors.deepPurple.shade50
-                                    : Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? Colors.deepPurple
-                                      : Colors.grey.shade300,
-                                  width: isSelected
-                                      ? 2.5
-                                      : 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 28,
-                                    height: 28,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isSelected
-                                          ? Colors.deepPurple
-                                          : Colors.transparent,
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? Colors.deepPurple
-                                            : Colors.grey.shade400,
-                                        width: 2.5,
-                                      ),
-                                    ),
-                                    child: isSelected
-                                        ? const Icon(
-                                            Icons.check,
-                                            size: 18,
-                                            color: Colors.white,
-                                          )
-                                        : null,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      q.options[i],
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        color: Colors.black87,
-                                        fontWeight: isSelected
-                                            ? FontWeight.w600
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
-                          ),
-                        ),
-                      );
-                    }),
-                    const SizedBox(height: 24),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: current > 0
-                                ? () => _navigateToQuestion(current - 1)
-                                : null,
-                            icon: const Icon(Icons.arrow_back),
-                            label: const Text('Previous'),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                          );
+                        }),
+
+                        const SizedBox(height: 12),
+
+                        // Locked Show Answer Button for Exam Mode
+                        Center(
+                          child: Tooltip(
+                            message: 'Available only in Practice Mode',
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                foregroundColor: AppTheme.secondaryText,
+                                side: const BorderSide(color: AppTheme.border),
                               ),
-                              side: BorderSide(color: Colors.grey.shade400),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () {
-                              if (isLastQuestion) {
-                                _showFinishDialog();
-                              } else {
-                                _navigateToQuestion(current + 1);
-                              }
-                            },
-                            icon: Icon(
-                              isLastQuestion
-                                  ? Icons.check_circle
-                                  : Icons.arrow_forward,
-                            ),
-                            label: Text(isLastQuestion ? 'Finish' : 'Next'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isLastQuestion
-                                  ? Colors.green
-                                  : Colors.deepPurple,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
+                              icon: const Icon(Icons.lock_outline, size: 18),
+                              label: const Text(
+                                'Show Answer (Available only in Practice Mode)',
+                                style: TextStyle(fontSize: 13, color: AppTheme.secondaryText),
                               ),
+                              onPressed: null,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: toggleMark,
-                        icon: Icon(
-                          marked.contains(q.id)
-                              ? Icons.bookmark
-                              : Icons.bookmark_border,
-                        ),
-                        label: Text(
-                          marked.contains(q.id) ? 'Unmark' : 'Mark for Review',
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: marked.contains(q.id)
-                              ? Colors.orange.shade900
-                              : Colors.deepPurple,
-                          side: BorderSide(
-                            color: marked.contains(q.id)
-                                ? Colors.orange
-                                : Colors.deepPurple,
-                            width: 1.5,
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
+
+            // Bottom Navigation Sticky Bar
             Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              decoration: const BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade300, width: 1),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
+                border: Border(top: BorderSide(color: AppTheme.border)),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Row(
                     children: [
-                      const Text(
-                        'Question Navigator',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: Colors.black87,
+                      // Previous Button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: const Icon(Icons.arrow_back, size: 18),
+                          label: const Text('Previous'),
+                          onPressed: current > 0
+                              ? () => _navigateToQuestion(current - 1)
+                              : null,
                         ),
                       ),
-                      const Spacer(),
-                      Text(
-                        '$answeredCount/${widget.questions.length} answered',
-                        style: TextStyle(
-                          color: Colors.grey.shade700,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+                      const SizedBox(width: 12),
+
+                      // Question Navigator Trigger Button
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
+                        icon: const Icon(Icons.grid_view, size: 18),
+                        label: const Text('Navigator'),
+                        onPressed: _showQuestionNavigatorModal,
                       ),
-                      IconButton(
-                        onPressed: () => setState(() => navigatorCollapsed = !navigatorCollapsed),
-                        icon: Icon(
-                          navigatorCollapsed ? Icons.expand_less : Icons.expand_more,
-                          color: Colors.deepPurple,
+                      const SizedBox(width: 12),
+
+                      // Next / Finish Button
+                      Expanded(
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isLast ? AppTheme.accentBlue : AppTheme.primaryNavy,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          icon: Icon(isLast ? Icons.check_circle_outline : Icons.arrow_forward, size: 18),
+                          label: Text(isLast ? 'Finish Exam' : 'Next'),
+                          onPressed: () {
+                            if (isLast) {
+                              _confirmSubmit();
+                            } else {
+                              _navigateToQuestion(current + 1);
+                            }
+                          },
                         ),
                       ),
                     ],
                   ),
-                  if (!navigatorCollapsed) ...[
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      height: 110,
-                      child: SingleChildScrollView(
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 6,
-                          children: widget.questions.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final qq = entry.value;
-                            final a = answers[qq.id];
-                            final isMarked = marked.contains(qq.id);
-                            final isCurrent = idx == current;
-                            return GestureDetector(
-                              onTap: () => _navigateToQuestion(idx),
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: isCurrent
-                                      ? Colors.deepPurple
-                                      : a != null
-                                          ? Colors.green.shade100
-                                          : isMarked
-                                              ? Colors.orange.shade100
-                                              : Colors.grey.shade50,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isCurrent
-                                        ? Colors.deepPurple.shade900
-                                        : a != null
-                                            ? Colors.green.shade600
-                                            : isMarked
-                                                ? Colors.orange.shade600
-                                                : Colors.grey.shade400,
-                                    width: isCurrent ? 2.5 : 1.5,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${idx + 1}',
-                                    style: TextStyle(
-                                      color: isCurrent
-                                          ? Colors.white
-                                          : a != null
-                                              ? Colors.green.shade900
-                                              : isMarked
-                                                  ? Colors.orange.shade900
-                                                  : Colors.black87,
-                                      fontWeight: isCurrent
-                                          ? FontWeight.bold
-                                          : FontWeight.w600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _showFinishDialog,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 2,
-                      ),
-                      child: const Text(
-                        'Finish Exam',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ],
-        ),
         ),
       ),
     );

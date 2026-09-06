@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
+import '../models/exam.dart';
 import '../models/performance.dart';
 
 class StorageService {
@@ -35,7 +36,8 @@ class StorageService {
         .where((f) =>
             f.path.endsWith('.json') &&
             !f.path.contains('performance_') &&
-            !f.path.contains('session_'))
+            !f.path.contains('session_') &&
+            !f.path.contains('settings.json'))
         .toList();
   }
 
@@ -54,6 +56,33 @@ class StorageService {
   static Future<void> deleteExamFile(String filename) async {
     final file = File('${mcqDir.path}/$filename');
     if (file.existsSync()) await file.delete();
+  }
+
+  static Future<void> saveExam(Exam exam) async {
+    exam.reindexQuestions();
+    final filename = '${exam.id}.json';
+    await saveExamFile(filename, exam.toJson());
+  }
+
+  static Future<List<Exam>> loadAllExams() async {
+    final files = listExamFiles();
+    final List<Exam> list = [];
+    for (var f in files) {
+      try {
+        final filename = f.path.split(Platform.pathSeparator).last;
+        final j = await readExamFile(filename);
+        final exam = Exam.fromJson(j);
+        list.add(exam);
+      } catch (e) {
+        // ignore malformed files
+      }
+    }
+    return list;
+  }
+
+  static Future<void> deleteExam(String examId) async {
+    await deleteExamFile('$examId.json');
+    await clearSession(examId);
   }
 
   // session save for progress/resume
