@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import '../main.dart';
 import '../models/student_profile.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
@@ -411,13 +410,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // 5. ABOUT SECTION
                 _sectionHeader('About', Icons.info_outline),
-                Card(
+                const Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(20),
+                    padding: EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             Text(
                               'QuizPro Exam Simulator',
@@ -435,7 +434,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         Text(
                           'Data is stored locally on your device by the application and is not uploaded to any remote servers.',
                           style: TextStyle(

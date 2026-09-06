@@ -341,6 +341,7 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
                   ],
                 ),
               );
+              if (!mounted) return;
               if (ok == true) {
                 final newPct = int.tryParse(pctCtrl.text.trim());
                 if (newPct != null && newPct >= 1 && newPct <= 100) {
@@ -351,7 +352,7 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
                   await _save();
                 } else {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    ScaffoldMessenger.of(this.context).showSnackBar(
                       const SnackBar(content: Text('Passing percentage must be between 1 and 100.')),
                     );
                   }

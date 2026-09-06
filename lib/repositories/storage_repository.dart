@@ -35,6 +35,12 @@ class IoStorageRepository implements IStorageRepository {
   late Directory tempDir;
   bool _initialized = false;
 
+  // In-memory caches for maximum performance
+  List<Exam>? _cachedExams;
+  List<ExamPerformance>? _cachedPerformances;
+  List<StudentProfile>? _cachedStudents;
+  Map<String, dynamic>? _cachedSettings;
+
   @override
   Future<void> init() async {
     if (_initialized) return;
@@ -50,6 +56,10 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<List<Exam>> getAllExams() async {
     await init();
+    if (_cachedExams != null) {
+      return List<Exam>.from(_cachedExams!);
+    }
+
     final List<Exam> exams = [];
     final files = mcqDir
         .listSync()
@@ -57,7 +67,8 @@ class IoStorageRepository implements IStorageRepository {
             f.path.endsWith('.json') &&
             !f.path.contains('performance_') &&
             !f.path.contains('session_') &&
-            !f.path.endsWith('settings.json'))
+            !f.path.endsWith('settings.json') &&
+            !f.path.endsWith('students.json'))
         .toList();
 
     for (final f in files) {
@@ -72,12 +83,18 @@ class IoStorageRepository implements IStorageRepository {
       }
     }
     exams.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return exams;
+    _cachedExams = exams;
+    return List<Exam>.from(exams);
   }
 
   @override
   Future<Exam?> getExamById(String id) async {
     await init();
+    if (_cachedExams != null) {
+      final match = _cachedExams!.where((e) => e.id == id);
+      if (match.isNotEmpty) return match.first;
+    }
+
     final file = File('${mcqDir.path}/$id.json');
     if (!await file.exists()) return null;
     try {
@@ -92,6 +109,17 @@ class IoStorageRepository implements IStorageRepository {
   Future<void> saveExam(Exam exam) async {
     await init();
     exam.reindexQuestions();
+
+    if (_cachedExams != null) {
+      final index = _cachedExams!.indexWhere((e) => e.id == exam.id);
+      if (index >= 0) {
+        _cachedExams![index] = exam;
+      } else {
+        _cachedExams!.insert(0, exam);
+      }
+      _cachedExams!.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    }
+
     final file = File('${mcqDir.path}/${exam.id}.json');
     await file.writeAsString(jsonEncode(exam.toJson()));
   }
@@ -99,6 +127,8 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<void> deleteExam(String id) async {
     await init();
+    _cachedExams?.removeWhere((e) => e.id == id);
+
     final file = File('${mcqDir.path}/$id.json');
     if (await file.exists()) {
       await file.delete();
@@ -109,6 +139,10 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<List<ExamPerformance>> getAllPerformances() async {
     await init();
+    if (_cachedPerformances != null) {
+      return List<ExamPerformance>.from(_cachedPerformances!);
+    }
+
     final files = mcqDir
         .listSync()
         .where(
@@ -124,12 +158,18 @@ class IoStorageRepository implements IStorageRepository {
     }
     // Newest first
     list.sort((a, b) => b.date.compareTo(a.date));
-    return list;
+    _cachedPerformances = list;
+    return List<ExamPerformance>.from(list);
   }
 
   @override
   Future<void> savePerformance(ExamPerformance performance) async {
     await init();
+    if (_cachedPerformances != null) {
+      _cachedPerformances!.insert(0, performance);
+      _cachedPerformances!.sort((a, b) => b.date.compareTo(a.date));
+    }
+
     final file = File(
       '${mcqDir.path}/performance_${performance.examId}_${DateTime.now().millisecondsSinceEpoch}.json',
     );
@@ -168,25 +208,36 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<Map<String, dynamic>> getSettings() async {
     await init();
+    if (_cachedSettings != null) {
+      return Map<String, dynamic>.from(_cachedSettings!);
+    }
+
     final file = File('${mcqDir.path}/settings.json');
     if (!await file.exists()) {
-      return _defaultSettings();
+      final defaults = _defaultSettings();
+      _cachedSettings = Map<String, dynamic>.from(defaults);
+      return defaults;
     }
     try {
       final text = await file.readAsString();
       final json = jsonDecode(text) as Map<String, dynamic>;
-      return {
+      final merged = {
         ..._defaultSettings(),
         ...json,
       };
+      _cachedSettings = Map<String, dynamic>.from(merged);
+      return merged;
     } catch (_) {
-      return _defaultSettings();
+      final defaults = _defaultSettings();
+      _cachedSettings = Map<String, dynamic>.from(defaults);
+      return defaults;
     }
   }
 
   @override
   Future<void> saveSettings(Map<String, dynamic> settings) async {
     await init();
+    _cachedSettings = Map<String, dynamic>.from(settings);
     final file = File('${mcqDir.path}/settings.json');
     await file.writeAsString(jsonEncode(settings));
   }
@@ -194,6 +245,11 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<void> clearAllData() async {
     await init();
+    _cachedExams = null;
+    _cachedPerformances = null;
+    _cachedStudents = null;
+    _cachedSettings = null;
+
     if (await mcqDir.exists()) {
       final list = mcqDir.listSync();
       for (final f in list) {
@@ -209,17 +265,25 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<List<StudentProfile>> getAllStudents() async {
     await init();
+    if (_cachedStudents != null) {
+      return List<StudentProfile>.from(_cachedStudents!);
+    }
+
     final file = File('${mcqDir.path}/students.json');
     if (!await file.exists()) {
+      _cachedStudents = [];
       return [];
     }
     try {
       final text = await file.readAsString();
       final list = jsonDecode(text) as List<dynamic>;
-      return list
+      final students = list
           .map((item) => StudentProfile.fromJson(item as Map<String, dynamic>))
           .toList();
+      _cachedStudents = students;
+      return List<StudentProfile>.from(students);
     } catch (_) {
+      _cachedStudents = [];
       return [];
     }
   }
@@ -244,6 +308,7 @@ class IoStorageRepository implements IStorageRepository {
     } else {
       students.add(student);
     }
+    _cachedStudents = students;
     final file = File('${mcqDir.path}/students.json');
     await file.writeAsString(
       jsonEncode(students.map((s) => s.toJson()).toList()),
@@ -255,6 +320,7 @@ class IoStorageRepository implements IStorageRepository {
     await init();
     final students = await getAllStudents();
     students.removeWhere((s) => s.id == id);
+    _cachedStudents = students;
     final file = File('${mcqDir.path}/students.json');
     await file.writeAsString(
       jsonEncode(students.map((s) => s.toJson()).toList()),

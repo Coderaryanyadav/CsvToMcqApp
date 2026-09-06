@@ -30,6 +30,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   String _selectedDifficulty = 'All';
   String _selectedType = 'All';
   bool _sortAscending = true;
+  List<Question> _cachedFilteredList = [];
 
   @override
   void initState() {
@@ -45,6 +46,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
         _selectedExam = _exams.first;
       }
     }
+    _recomputeFilteredQuestions();
   }
 
   @override
@@ -53,27 +55,11 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
     super.dispose();
   }
 
-  Future<void> _saveCurrentExam() async {
-    if (_selectedExam != null) {
-      await StorageService.saveExam(_selectedExam!);
-      setState(() {});
+  void _recomputeFilteredQuestions() {
+    if (_selectedExam == null) {
+      _cachedFilteredList = [];
+      return;
     }
-  }
-
-  List<String> get _topics {
-    if (_selectedExam == null) return ['All Topics'];
-    final t = _selectedExam!.questions
-        .map((q) => q.topic)
-        .where((x) => x != null && x.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList();
-    t.sort();
-    return ['All Topics', ...t];
-  }
-
-  List<Question> get _filteredQuestions {
-    if (_selectedExam == null) return [];
     var list = List<Question>.from(_selectedExam!.questions);
 
     // Search query
@@ -118,8 +104,30 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
       return _sortAscending ? aNum.compareTo(bNum) : bNum.compareTo(aNum);
     });
 
-    return list;
+    _cachedFilteredList = list;
   }
+
+  Future<void> _saveCurrentExam() async {
+    if (_selectedExam != null) {
+      await StorageService.saveExam(_selectedExam!);
+      _recomputeFilteredQuestions();
+      setState(() {});
+    }
+  }
+
+  List<String> get _topics {
+    if (_selectedExam == null) return ['All Topics'];
+    final t = _selectedExam!.questions
+        .map((q) => q.topic)
+        .where((x) => x != null && x.isNotEmpty)
+        .cast<String>()
+        .toSet()
+        .toList();
+    t.sort();
+    return ['All Topics', ...t];
+  }
+
+  List<Question> get _filteredQuestions => _cachedFilteredList;
 
   Future<void> _importQuestionsToCurrentExam() async {
     if (_selectedExam == null) return;
@@ -873,6 +881,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                           setState(() {
                             _selectedExam = _exams.firstWhere((e) => e.id == val);
                             _selectedTopic = 'All Topics';
+                            _recomputeFilteredQuestions();
                           });
                         }
                       },
@@ -915,7 +924,9 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                             icon: const Icon(Icons.clear),
                             onPressed: () {
                               _searchCtrl.clear();
-                              setState(() {});
+                              setState(() {
+                                _recomputeFilteredQuestions();
+                              });
                             },
                           )
                         : null,
@@ -925,7 +936,9 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setState(() {
+                    _recomputeFilteredQuestions();
+                  }),
                 ),
                 const SizedBox(height: 10),
                 SingleChildScrollView(
@@ -943,7 +956,12 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 ))
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _selectedTopic = v);
+                          if (v != null) {
+                            setState(() {
+                              _selectedTopic = v;
+                              _recomputeFilteredQuestions();
+                            });
+                          }
                         },
                       ),
                       const SizedBox(width: 16),
@@ -962,7 +980,10 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                             .toList(),
                         onChanged: (v) {
                           if (v != null) {
-                            setState(() => _selectedDifficulty = v);
+                            setState(() {
+                              _selectedDifficulty = v;
+                              _recomputeFilteredQuestions();
+                            });
                           }
                         },
                       ),
@@ -981,7 +1002,12 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 ))
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _selectedType = v);
+                          if (v != null) {
+                            setState(() {
+                              _selectedType = v;
+                              _recomputeFilteredQuestions();
+                            });
+                          }
                         },
                       ),
                       const SizedBox(width: 16),
@@ -1001,6 +1027,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         onPressed: () {
                           setState(() {
                             _sortAscending = !_sortAscending;
+                            _recomputeFilteredQuestions();
                           });
                         },
                       ),
@@ -1050,7 +1077,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       ],
                     ),
                   )
-                  : ListView.separated(
+                : ListView.separated(
+                    addRepaintBoundaries: true,
                     padding:
                         const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: questions.length,

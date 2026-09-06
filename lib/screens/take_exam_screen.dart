@@ -299,8 +299,6 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       );
     }
 
-    final totalQuestionsInExam = selectedExam!.questions.length;
-
     return Scaffold(
       appBar: AppBar(
         title:
@@ -392,7 +390,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
                 // 3. QUESTIONS COUNT
                 _sectionTitle(
-                    '3. Number of Questions (${_availableQuestionsCount} Available)', Icons.format_list_numbered),
+                    '3. Number of Questions ($_availableQuestionsCount Available)', Icons.format_list_numbered),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
