@@ -47,17 +47,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       settings[key] = value;
     });
     await StorageService.saveSettings(settings);
-
-    if (key == 'themeMode') {
-      final modeStr = value.toString().toLowerCase();
-      if (modeStr == 'dark') {
-        themeModeNotifier.value = ThemeMode.dark;
-      } else if (modeStr == 'light') {
-        themeModeNotifier.value = ThemeMode.light;
-      } else {
-        themeModeNotifier.value = ThemeMode.system;
-      }
-    }
   }
 
   Future<void> _exportAllData() async {
@@ -174,18 +163,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     if (loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('Settings')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-
-    final currentThemeMode =
-        settings['themeMode']?.toString().toLowerCase() ?? 'system';
 
     return Scaffold(
       appBar: AppBar(
@@ -204,31 +187,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 Card(
                   child: Column(
                     children: [
-                      ListTile(
-                        leading: const Icon(Icons.brightness_medium_outlined),
-                        title: const Text('Theme Mode',
-                            style: TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: const Text(
-                            'Choose between light, dark, or system preference'),
-                        trailing: DropdownButton<String>(
-                          value: currentThemeMode,
-                          underline: const SizedBox(),
-                          items: const [
-                            DropdownMenuItem(
-                                value: 'system', child: Text('System Default')),
-                            DropdownMenuItem(
-                                value: 'light', child: Text('Light Mode')),
-                            DropdownMenuItem(
-                                value: 'dark', child: Text('Dark Mode')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              _updateSetting('themeMode', val);
-                            }
-                          },
-                        ),
-                      ),
-                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.format_size),
                         title: const Text('Question Font Size',
@@ -432,9 +390,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Data is stored locally on your device by the application and is not uploaded to any remote servers.',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark
-                                ? AppTheme.darkSecondaryText
-                                : AppTheme.secondaryText,
+                            color: AppTheme.secondaryText,
                           ),
                         ),
                       ],
