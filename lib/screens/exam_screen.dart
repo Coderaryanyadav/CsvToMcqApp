@@ -36,7 +36,6 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   DateTime? _questionStartTime;
   final Map<String, int> _timeSpent = {};
   DateTime _examStartTime = DateTime.now();
-  bool showAnswers = false;
   bool navigatorCollapsed = false;
 
   @override
@@ -289,11 +288,6 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
         ),
         actions: [
           IconButton(
-            tooltip: showAnswers ? 'Hide Answers' : 'Show Answers',
-            icon: Icon(showAnswers ? Icons.visibility_off : Icons.visibility, color: Colors.white),
-            onPressed: () => setState(() => showAnswers = !showAnswers),
-          ),
-          IconButton(
             tooltip: 'Pause/Resume',
             icon: Icon(
               _timer == null ? Icons.play_arrow : Icons.pause,
@@ -448,7 +442,6 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                     ...List.generate(4, (i) {
                       final sel = answers[q.id];
                       final isSelected = sel == i;
-                      final isCorrect = i == q.correct;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         child: Material(
@@ -464,16 +457,12 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                     : Colors.white,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: showAnswers && isCorrect
-                                      ? Colors.green
-                                      : isSelected
-                                          ? Colors.deepPurple
-                                          : Colors.grey.shade300,
-                                  width: showAnswers && isCorrect
+                                  color: isSelected
+                                      ? Colors.deepPurple
+                                      : Colors.grey.shade300,
+                                  width: isSelected
                                       ? 2.5
-                                      : isSelected
-                                          ? 2.5
-                                          : 1.5,
+                                      : 1.5,
                                 ),
                               ),
                               child: Row(
@@ -485,15 +474,11 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                       shape: BoxShape.circle,
                                       color: isSelected
                                           ? Colors.deepPurple
-                                          : showAnswers && isCorrect
-                                              ? Colors.green
-                                              : Colors.transparent,
+                                          : Colors.transparent,
                                       border: Border.all(
                                         color: isSelected
                                             ? Colors.deepPurple
-                                            : showAnswers && isCorrect
-                                                ? Colors.green
-                                                : Colors.grey.shade400,
+                                            : Colors.grey.shade400,
                                         width: 2.5,
                                       ),
                                     ),
@@ -503,13 +488,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                             size: 18,
                                             color: Colors.white,
                                           )
-                                        : showAnswers && isCorrect
-                                            ? const Icon(
-                                                Icons.check,
-                                                size: 18,
-                                                color: Colors.white,
-                                              )
-                                            : null,
+                                        : null,
                                   ),
                                   const SizedBox(width: 16),
                                   Expanded(
@@ -517,9 +496,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                       q.options[i],
                                       style: TextStyle(
                                         fontSize: 16,
-                                        color: showAnswers && isCorrect
-                                            ? Colors.green.shade800
-                                            : Colors.black87,
+                                        color: Colors.black87,
                                         fontWeight: isSelected
                                             ? FontWeight.w600
                                             : FontWeight.normal,
@@ -534,37 +511,6 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                       );
                     }),
                     const SizedBox(height: 24),
-                    if (showAnswers) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.shade200),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Correct answer: ${q.options[q.correct]}',
-                              style: TextStyle(
-                                color: Colors.green.shade800,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (q.explanation != null) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                q.explanation!,
-                                style: TextStyle(color: Colors.green.shade900),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
                     Row(
                       children: [
                         Expanded(
