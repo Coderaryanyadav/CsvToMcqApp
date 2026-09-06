@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/storage_service.dart';
+import 'theme/app_theme.dart';
+
+final ValueNotifier<bool> darkModeNotifier = ValueNotifier(false);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
+  final settings = await StorageService.loadSettings();
+  darkModeNotifier.value = settings['darkMode'] ?? false;
   runApp(const MyApp());
 }
 
@@ -13,18 +18,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const color = Colors.deepPurple;
-    return MaterialApp(
-      title: 'MCQ Exams',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.deepPurple,
-        colorScheme: ColorScheme.fromSeed(seedColor: color),
-        scaffoldBackgroundColor: Colors.white,
-        appBarTheme: const AppBarTheme(backgroundColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      home: const HomeScreen(),
+    return ValueListenableBuilder<bool>(
+      valueListenable: darkModeNotifier,
+      builder: (context, isDark, child) {
+        return MaterialApp(
+          title: 'MCQ Exams',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          home: const HomeScreen(),
+        );
+      },
     );
   }
 }

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/exam.dart';
 import '../models/question.dart';
+import '../services/import_service.dart';
 import '../services/storage_service.dart';
-import '../services/excel_service.dart';
+import 'import_preview_screen.dart';
 
 class AddEditExamScreen extends StatefulWidget {
   final String? examId;
@@ -56,16 +57,31 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
 
     if (widget.importOnly) {
       try {
-        final imported = await ExcelService.importFromExcel();
-        if (imported == null) {
+        final importResult = await ImportService.pickAndPreviewFile();
+        if (importResult == null) {
           if (!mounted) return;
           Navigator.pop(context);
           return;
         }
+        
+        if (!mounted) return;
+        final previewedExam = await Navigator.push<Exam>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ImportPreviewScreen(importResult: importResult),
+          ),
+        );
+        
+        if (previewedExam == null) {
+          if (!mounted) return;
+          Navigator.pop(context);
+          return;
+        }
+        
         exam = Exam(
-          id: imported.id,
+          id: const Uuid().v4(),
           name: 'Imported Exam',
-          questions: imported.questions,
+          questions: previewedExam.questions,
         );
         _save();
         if (!mounted) return;
@@ -263,7 +279,7 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
   }
 
   Future<void> exportExam() async {
-    final p = await ExcelService.exportToExcelFile(exam);
+    final p = await ImportService.exportToCsvFile(exam);
     if (p != null) {
       if (!mounted) return;
       ScaffoldMessenger.of(

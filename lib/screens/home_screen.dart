@@ -1,7 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../services/storage_service.dart';
-import '../services/excel_service.dart';
+import '../services/import_service.dart';
 import '../services/analytics_service.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
@@ -10,6 +11,8 @@ import 'exam_audit_screen.dart';
 import 'take_exam_screen.dart';
 import 'statistics_screen.dart';
 import 'practice_mode_screen.dart';
+import 'import_preview_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   // ignore: use_super_parameters
@@ -79,10 +82,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _uploadExam() async {
     try {
-      final imported = await ExcelService.importFromExcel();
-      if (imported == null) return;
+      final importResult = await ImportService.pickAndPreviewFile();
+      if (importResult == null) return;
       if (!mounted) return;
-      final nameCtrl = TextEditingController(text: imported.name.isNotEmpty ? imported.name : 'Imported Exam');
+
+      final previewedExam = await Navigator.push<Exam>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ImportPreviewScreen(importResult: importResult),
+        ),
+      );
+
+      if (previewedExam == null) return;
+      if (!mounted) return;
+
+      final nameCtrl = TextEditingController(text: previewedExam.name.isNotEmpty ? previewedExam.name : 'Imported Exam');
       final proceed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -107,9 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
       );
       if (proceed != true) return;
       final named = Exam(
-        id: imported.id,
-        name: nameCtrl.text.trim().isEmpty ? imported.name : nameCtrl.text.trim(),
-        questions: imported.questions,
+        id: const Uuid().v4(), // Give it a fresh ID
+        name: nameCtrl.text.trim().isEmpty ? previewedExam.name : nameCtrl.text.trim(),
+        questions: previewedExam.questions,
       );
       if (!mounted) return;
       await Navigator.push(
@@ -200,14 +214,29 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
+          IconButton(
+            tooltip: 'Settings',
+            icon: const Icon(Icons.settings, color: Colors.white),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              );
+            },
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1100),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
                   children: [
                     Container(
                       decoration: BoxDecoration(
@@ -570,6 +599,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
             ),
+          ),
+        ),
     );
   }
 }

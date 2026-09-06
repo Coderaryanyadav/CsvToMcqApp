@@ -1,4 +1,4 @@
-import 'dart:async';
+wimport 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/performance.dart';
@@ -37,6 +37,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   final Map<String, int> _timeSpent = {};
   DateTime _examStartTime = DateTime.now();
   bool navigatorCollapsed = false;
+  bool _isFinishing = false;
 
   @override
   void initState() {
@@ -108,6 +109,16 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
         );
         final lm = session['marked'] as List?;
         if (lm != null) marked = Set.from(lm.map((e) => e.toString()));
+        final tm = session['timeSpent'] as Map?;
+        if (tm != null) {
+          tm.forEach((k, v) {
+            if (v != null) _timeSpent[k.toString()] = v as int;
+          });
+        }
+        final startTime = session['examStartTime'] as int?;
+        if (startTime != null) {
+          _examStartTime = DateTime.fromMillisecondsSinceEpoch(startTime);
+        }
         setState(() {});
       } catch (e) {
         // ignore parse errors
@@ -135,6 +146,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       'current': current,
       'answers': answers,
       'marked': marked.toList(),
+      'timeSpent': _timeSpent,
+      'examStartTime': _examStartTime.millisecondsSinceEpoch,
     };
     await StorageService.saveSession(widget.examId!, session);
   }
@@ -210,6 +223,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   }
 
   void finishExam() async {
+    if (_isFinishing) return;
+    _isFinishing = true;
     _trackQuestionTime();
     _timer?.cancel();
     _autosaveTimer?.cancel();
@@ -273,11 +288,38 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     final answeredCount = answers.values.where((a) => a != null).length;
     final isLastQuestion = current == widget.questions.length - 1;
 
-    return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        elevation: 0,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        final shouldPop = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Leave Exam?'),
+            content: const Text('Your progress has been saved.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Stay'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text('Leave Exam'),
+              ),
+            ],
+          ),
+        );
+        if (shouldPop ?? false) {
+          if (!mounted) return;
+          Navigator.pop(context);
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.grey.shade50,
+        appBar: AppBar(
+          backgroundColor: Colors.deepPurple,
+          elevation: 0,
         title: Text(
           'Question ${current + 1} of ${widget.questions.length}',
           style: const TextStyle(
@@ -730,6 +772,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
