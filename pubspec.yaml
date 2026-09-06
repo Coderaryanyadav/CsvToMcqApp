@@ -2,7 +2,7 @@ name: csv_to_mcq_app
 description: Fully integrated optimized exam app with CSV import, scoring, analytics and tests.
 publish_to: "none"
 environment:
-  sdk: ">=2.18.0 <4.0.0"
+  sdk: ">=3.0.0 <4.0.0"
 dependencies:
   flutter:
     sdk: flutter

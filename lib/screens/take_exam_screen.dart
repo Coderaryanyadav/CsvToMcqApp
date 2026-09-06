@@ -23,13 +23,15 @@ class TakeExamScreen extends StatefulWidget {
 }
 
 class _TakeExamScreenState extends State<TakeExamScreen> {
-  late Exam selectedExam;
+  Exam? selectedExam;
   bool isPracticeMode = true;
   int selectedQuestionCount = 20;
+  bool isAllQuestions = false;
   bool isCustomCount = false;
-  int selectedDurationMin = 30;
+  int selectedDurationMin = 30; // 0 = Untimed
   bool isCustomDuration = false;
-  bool shuffle = false;
+  bool shuffleQuestions = true;
+  bool shuffleOptions = false;
   String selectedDifficulty = 'Any';
   String selectedTopic = 'All Topics';
   List<String> availableTopics = ['All Topics'];
@@ -37,21 +39,23 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   final TextEditingController _customDurationCtrl = TextEditingController();
 
   final List<int> _presetCounts = [10, 20, 30, 50];
-  final List<int> _presetDurations = [15, 30, 45, 60];
+  final List<int> _presetDurations = [0, 15, 30, 45, 60];
 
   @override
   void initState() {
     super.initState();
     isPracticeMode = widget.defaultToPractice;
-    if (widget.initialExamId != null) {
-      selectedExam = widget.exams.firstWhere(
-        (e) => e.id == widget.initialExamId,
-        orElse: () => widget.exams.first,
-      );
-    } else {
-      selectedExam = widget.exams.first;
+    if (widget.exams.isNotEmpty) {
+      if (widget.initialExamId != null) {
+        selectedExam = widget.exams.firstWhere(
+          (e) => e.id == widget.initialExamId,
+          orElse: () => widget.exams.first,
+        );
+      } else {
+        selectedExam = widget.exams.first;
+      }
+      _initExamData();
     }
-    _initExamData();
   }
 
   @override
@@ -62,16 +66,19 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 
   void _initExamData() {
-    final totalQ = selectedExam.questions.length;
+    if (selectedExam == null) return;
+    final totalQ = selectedExam!.questions.length;
     if (totalQ < 20) {
       selectedQuestionCount = totalQ > 0 ? totalQ : 10;
     } else {
       selectedQuestionCount = 20;
     }
+    selectedDurationMin = selectedExam!.defaultDuration ?? 30;
+
     _customCountCtrl.text = '$selectedQuestionCount';
     _customDurationCtrl.text = '$selectedDurationMin';
 
-    final topics = selectedExam.questions
+    final topics = selectedExam!.questions
         .map((q) => q.topic)
         .where((t) => t != null && t.isNotEmpty)
         .cast<String>()
@@ -83,7 +90,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 
   List<Question> _getFilteredQuestions() {
-    final questions = List<Question>.from(selectedExam.questions);
+    if (selectedExam == null) return [];
+    var questions = List<Question>.from(selectedExam!.questions);
 
     if (selectedTopic != 'All Topics') {
       questions.retainWhere((q) => q.topic == selectedTopic);
@@ -99,7 +107,40 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       }
     }
 
-    if (shuffle) questions.shuffle();
+    if (shuffleQuestions) {
+      questions.shuffle();
+    }
+
+    if (shuffleOptions) {
+      // Create copies with shuffled options
+      questions = questions.map((origQ) {
+        final originalCorrectOptions =
+            origQ.correctAnswers.map((idx) => origQ.options[idx]).toSet();
+        final optionsCopy = List<String>.from(origQ.options)..shuffle();
+        final newCorrectAnswers = <int>{};
+        final newExplanations = <int, String>{};
+
+        for (int i = 0; i < optionsCopy.length; i++) {
+          if (originalCorrectOptions.contains(optionsCopy[i])) {
+            newCorrectAnswers.add(i);
+          }
+          final oldIdx = origQ.options.indexOf(optionsCopy[i]);
+          if (oldIdx != -1 && origQ.optionExplanations.containsKey(oldIdx)) {
+            newExplanations[i] = origQ.optionExplanations[oldIdx]!;
+          }
+        }
+
+        return origQ.copyWith(
+          options: optionsCopy,
+          correctAnswers: newCorrectAnswers,
+          optionExplanations: newExplanations,
+        );
+      }).toList();
+    }
+
+    if (isAllQuestions) {
+      return questions;
+    }
 
     final maxAvail = questions.length;
     final count = min(selectedQuestionCount, maxAvail);
@@ -107,6 +148,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 
   void _startSession() {
+    if (selectedExam == null) return;
     final filtered = _getFilteredQuestions();
     if (filtered.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -125,7 +167,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           builder: (_) => PracticeModeScreen(
             questions: filtered,
             durationMin: selectedDurationMin,
-            examName: selectedExam.name,
+            examName: selectedExam!.name,
           ),
         ),
       );
@@ -136,593 +178,408 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
           builder: (_) => ExamScreen(
             questions: filtered,
             durationMin: selectedDurationMin,
-            examId: selectedExam.id,
-            examName: selectedExam.name,
+            examId: selectedExam!.id,
+            examName: selectedExam!.name,
+            passingPercentage: selectedExam!.passingPercentage,
           ),
         ),
       );
     }
   }
 
-  void _showExamPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 8),
-              child: Text(
-                'Select Exam',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.text),
-              ),
-            ),
-            const Divider(),
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: widget.exams.length,
-                itemBuilder: (_, i) {
-                  final e = widget.exams[i];
-                  final isSel = e.id == selectedExam.id;
-                  return ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isSel ? AppTheme.primaryNavy : const Color(0xFFE5E8ED),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(
-                        Icons.school,
-                        color: isSel ? Colors.white : AppTheme.secondaryText,
-                        size: 20,
-                      ),
-                    ),
-                    title: Text(e.name, style: const TextStyle(fontWeight: FontWeight.w600, color: AppTheme.text)),
-                    subtitle: Text('${e.questions.length} Questions', style: const TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
-                    trailing: isSel ? const Icon(Icons.check_circle, color: AppTheme.accentBlue) : null,
-                    onTap: () {
-                      setState(() {
-                        selectedExam = e;
-                        _initExamData();
-                      });
-                      Navigator.pop(ctx);
-                    },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _promptCustomCount() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Custom Question Count'),
-        content: TextField(
-          controller: _customCountCtrl,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Number of Questions (max ${selectedExam.questions.length})',
-            hintText: 'Enter question count',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = int.tryParse(_customCountCtrl.text);
-              if (val != null && val > 0) {
-                setState(() {
-                  selectedQuestionCount = min(val, selectedExam.questions.length);
-                  isCustomCount = true;
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Set'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _promptCustomDuration() {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Custom Duration'),
-        content: TextField(
-          controller: _customDurationCtrl,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Duration in Minutes',
-            hintText: 'e.g. 40',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = int.tryParse(_customDurationCtrl.text);
-              if (val != null && val > 0) {
-                setState(() {
-                  selectedDurationMin = val;
-                  isCustomDuration = true;
-                });
-              }
-              Navigator.pop(ctx);
-            },
-            child: const Text('Set'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    final totalQ = selectedExam.questions.length;
-    final modeTitle = isPracticeMode ? 'Practice' : 'Exam';
-    final actualCount = min(selectedQuestionCount, max(1, totalQ));
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: const Text('Start New Session'),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 24.0),
+    if (widget.exams.isEmpty || selectedExam == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Exam Setup')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(32.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // 1. Exam Selection
-                const Text(
-                  'Exam',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.secondaryText,
-                    letterSpacing: 0.5,
-                  ),
+                Icon(Icons.school_outlined,
+                    size: 64, color: AppTheme.secondaryText),
+                SizedBox(height: 16),
+                Text(
+                  'No Exams Available',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(height: 8),
-                InkWell(
-                  onTap: widget.exams.length > 1 ? _showExamPicker : null,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      border: Border.all(color: AppTheme.border),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEBF2FA),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Icon(Icons.school, color: AppTheme.primaryNavy, size: 20),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                selectedExam.name,
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppTheme.text,
-                                ),
-                              ),
-                              Text(
-                                '$totalQ Questions Available',
-                                style: const TextStyle(
-                                  color: AppTheme.secondaryText,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (widget.exams.length > 1)
-                          const Icon(Icons.arrow_drop_down, color: AppTheme.secondaryText, size: 24),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 28),
-
-                // 2. Session Mode
-                const Text(
-                  'Session Mode',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.secondaryText,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    // Practice Mode Card
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setState(() => isPracticeMode = true),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: isPracticeMode ? AppTheme.accentBlue : AppTheme.border,
-                              width: isPracticeMode ? 2 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.school_outlined,
-                                    color: isPracticeMode ? AppTheme.accentBlue : AppTheme.secondaryText,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Practice Mode',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                      color: isPracticeMode ? AppTheme.primaryNavy : AppTheme.text,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Reveal answers and explanations while answering.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: AppTheme.secondaryText,
-                                  height: 1.35,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    // Exam Mode Card
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => setState(() => isPracticeMode = false),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: !isPracticeMode ? AppTheme.accentBlue : AppTheme.border,
-                              width: !isPracticeMode ? 2 : 1,
-                            ),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.assignment_outlined,
-                                    color: !isPracticeMode ? AppTheme.accentBlue : AppTheme.secondaryText,
-                                    size: 22,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    'Exam Mode',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 15,
-                                      color: !isPracticeMode ? AppTheme.primaryNavy : AppTheme.text,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              const Text(
-                                'Simulate the real exam. Answers remain locked until submission.',
-                                style: TextStyle(
-                                  fontSize: 12.5,
-                                  color: AppTheme.secondaryText,
-                                  height: 1.35,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 28),
-
-                // 3. Number of Questions
-                const Text(
-                  'Number of Questions',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.secondaryText,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    ..._presetCounts.map((cnt) {
-                      final isSelected = !isCustomCount && selectedQuestionCount == cnt;
-                      final isOverMax = cnt > totalQ && totalQ > 0;
-                      return ChoiceChip(
-                        label: Text('$cnt'),
-                        selected: isSelected,
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() {
-                              isCustomCount = false;
-                              selectedQuestionCount = isOverMax ? totalQ : cnt;
-                            });
-                          }
-                        },
-                        selectedColor: AppTheme.primaryNavy,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppTheme.text,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSelected ? AppTheme.primaryNavy : AppTheme.border,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      );
-                    }),
-                    ChoiceChip(
-                      label: Text(isCustomCount ? 'Custom ($selectedQuestionCount)' : 'Custom'),
-                      selected: isCustomCount,
-                      onSelected: (sel) {
-                        _promptCustomCount();
-                      },
-                      selectedColor: AppTheme.primaryNavy,
-                      labelStyle: TextStyle(
-                        color: isCustomCount ? Colors.white : AppTheme.text,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      backgroundColor: Colors.white,
-                      side: BorderSide(
-                        color: isCustomCount ? AppTheme.primaryNavy : AppTheme.border,
-                      ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 28),
-
-                // 4. Duration
-                const Text(
-                  'Duration',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.secondaryText,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    ..._presetDurations.map((dur) {
-                      final isSelected = !isCustomDuration && selectedDurationMin == dur;
-                      return ChoiceChip(
-                        label: Text('$dur min'),
-                        selected: isSelected,
-                        onSelected: (sel) {
-                          if (sel) {
-                            setState(() {
-                              isCustomDuration = false;
-                              selectedDurationMin = dur;
-                            });
-                          }
-                        },
-                        selectedColor: AppTheme.primaryNavy,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : AppTheme.text,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        backgroundColor: Colors.white,
-                        side: BorderSide(
-                          color: isSelected ? AppTheme.primaryNavy : AppTheme.border,
-                        ),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      );
-                    }),
-                    ChoiceChip(
-                      label: Text(isCustomDuration ? 'Custom ($selectedDurationMin min)' : 'Custom'),
-                      selected: isCustomDuration,
-                      onSelected: (sel) {
-                        _promptCustomDuration();
-                      },
-                      selectedColor: AppTheme.primaryNavy,
-                      labelStyle: TextStyle(
-                        color: isCustomDuration ? Colors.white : AppTheme.text,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      backgroundColor: Colors.white,
-                      side: BorderSide(
-                        color: isCustomDuration ? AppTheme.primaryNavy : AppTheme.border,
-                      ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 28),
-
-                // 5. Advanced Filters & Options Card
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: const Text(
-                    'Optional Filters & Options',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.secondaryText,
-                    ),
-                  ),
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppTheme.border),
-                      ),
-                      child: Column(
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text('Difficulty', style: TextStyle(fontWeight: FontWeight.w500)),
-                              DropdownButton<String>(
-                                value: selectedDifficulty,
-                                underline: const SizedBox(),
-                                items: ['Any', 'Easy', 'Medium', 'Hard']
-                                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                                    .toList(),
-                                onChanged: (v) {
-                                  if (v != null) setState(() => selectedDifficulty = v);
-                                },
-                              ),
-                            ],
-                          ),
-                          if (availableTopics.length > 1) ...[
-                            const Divider(height: 16),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                const Text('Topic', style: TextStyle(fontWeight: FontWeight.w500)),
-                                DropdownButton<String>(
-                                  value: selectedTopic,
-                                  underline: const SizedBox(),
-                                  items: availableTopics
-                                      .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                                      .toList(),
-                                  onChanged: (v) {
-                                    if (v != null) setState(() => selectedTopic = v);
-                                  },
-                                ),
-                              ],
-                            ),
-                          ],
-                          const Divider(height: 16),
-                          SwitchListTile(
-                            contentPadding: EdgeInsets.zero,
-                            title: const Text('Shuffle Questions', style: TextStyle(fontWeight: FontWeight.w500)),
-                            value: shuffle,
-                            onChanged: (v) => setState(() => shuffle = v),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-
-                // 6. Session Summary Box
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEBF2FA),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFDBEAFE)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.info_outline, color: AppTheme.accentBlue, size: 18),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          '${selectedExam.name}  ·  $modeTitle  ·  $actualCount Questions  ·  $selectedDurationMin Minutes',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppTheme.primaryNavy,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // 7. Primary CTA
-                SizedBox(
-                  height: 52,
-                  child: FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: isPracticeMode ? AppTheme.accentBlue : AppTheme.primaryNavy,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: totalQ > 0 ? _startSession : null,
-                    child: Text(
-                      isPracticeMode ? 'Start Practice' : 'Start Exam',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                SizedBox(height: 8),
+                Text(
+                  'Please create an exam track or import a question bank first.',
+                  style: TextStyle(color: AppTheme.secondaryText),
                 ),
               ],
             ),
           ),
+        ),
+      );
+    }
+
+    final totalQuestionsInExam = selectedExam!.questions.length;
+
+    return Scaffold(
+      appBar: AppBar(
+        title:
+            Text(isPracticeMode ? 'Practice Setup' : 'Exam Simulation Setup'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 850),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 1. SELECT EXAM TRACK
+                _sectionTitle('1. Target Exam Track', Icons.school),
+                Card(
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: selectedExam!.id,
+                        items: widget.exams.map((e) {
+                          return DropdownMenuItem(
+                            value: e.id,
+                            child: Row(
+                              children: [
+                                Text(e.name,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
+                                const SizedBox(width: 12),
+                                Chip(
+                                  label: Text('${e.questions.length} Questions',
+                                      style: const TextStyle(fontSize: 11)),
+                                  visualDensity: VisualDensity.compact,
+                                  padding: EdgeInsets.zero,
+                                ),
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              selectedExam =
+                                  widget.exams.firstWhere((e) => e.id == val);
+                              _initExamData();
+                            });
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 2. MODE SELECTION (Exam vs Practice)
+                _sectionTitle('2. Session Mode', Icons.dashboard_outlined),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildModeCard(
+                        title: 'Exam Mode',
+                        desc:
+                            'Timed simulation, final score, question navigator, and pass/fail evaluation.',
+                        icon: Icons.timer_outlined,
+                        isSelected: !isPracticeMode,
+                        onTap: () => setState(() => isPracticeMode = false),
+                        isDark: isDark,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildModeCard(
+                        title: 'Practice Mode',
+                        desc:
+                            'Untimed or self-paced study with instant feedback and answer explanations.',
+                        icon: Icons.lightbulb_outline,
+                        isSelected: isPracticeMode,
+                        onTap: () => setState(() => isPracticeMode = true),
+                        isDark: isDark,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // 3. QUESTIONS COUNT
+                _sectionTitle(
+                    '3. Number of Questions', Icons.format_list_numbered),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            ..._presetCounts.map((count) {
+                              final isSel = !isAllQuestions &&
+                                  !isCustomCount &&
+                                  selectedQuestionCount == count;
+                              return ChoiceChip(
+                                label: Text('$count Questions'),
+                                selected: isSel,
+                                onSelected: (v) {
+                                  if (v) {
+                                    setState(() {
+                                      selectedQuestionCount = count;
+                                      isAllQuestions = false;
+                                      isCustomCount = false;
+                                    });
+                                  }
+                                },
+                              );
+                            }),
+                            ChoiceChip(
+                              label: Text('All ($totalQuestionsInExam)'),
+                              selected: isAllQuestions,
+                              onSelected: (v) {
+                                if (v) {
+                                  setState(() {
+                                    isAllQuestions = true;
+                                    isCustomCount = false;
+                                    selectedQuestionCount =
+                                        totalQuestionsInExam;
+                                  });
+                                }
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 4. DURATION SELECTION
+                _sectionTitle('4. Exam Duration', Icons.access_time),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: _presetDurations.map((duration) {
+                        final isSel = selectedDurationMin == duration;
+                        final label = duration == 0
+                            ? 'Untimed (No Limit)'
+                            : '$duration Minutes';
+                        return ChoiceChip(
+                          label: Text(label),
+                          selected: isSel,
+                          onSelected: (v) {
+                            if (v) {
+                              setState(() {
+                                selectedDurationMin = duration;
+                              });
+                            }
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 5. FILTERS & OPTIONS
+                _sectionTitle('5. Filters & Options', Icons.tune),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      children: [
+                        // Topic Dropdown
+                        Row(
+                          children: [
+                            const Text('Topic:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: DropdownButton<String>(
+                                isExpanded: true,
+                                value: selectedTopic,
+                                underline: const SizedBox(),
+                                items: availableTopics.map((t) {
+                                  return DropdownMenuItem(
+                                      value: t, child: Text(t));
+                                }).toList(),
+                                onChanged: (v) {
+                                  if (v != null) {
+                                    setState(() => selectedTopic = v);
+                                  }
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+
+                        // Difficulty
+                        Row(
+                          children: [
+                            const Text('Difficulty:',
+                                style: TextStyle(
+                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            const SizedBox(width: 16),
+                            Wrap(
+                              spacing: 8,
+                              children:
+                                  ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
+                                final isSel = selectedDifficulty == d;
+                                return ChoiceChip(
+                                  label: Text(d),
+                                  selected: isSel,
+                                  onSelected: (v) {
+                                    if (v) {
+                                      setState(() => selectedDifficulty = d);
+                                    }
+                                  },
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 20),
+
+                        // Switches
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Shuffle Questions',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: const Text('Randomize question sequence'),
+                          value: shuffleQuestions,
+                          onChanged: (v) =>
+                              setState(() => shuffleQuestions = v),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text('Shuffle Options (A/B/C/D)',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: const Text(
+                              'Randomize option order for each question'),
+                          value: shuffleOptions,
+                          onChanged: (v) => setState(() => shuffleOptions = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+
+                // START BUTTON
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isPracticeMode
+                          ? AppTheme.primaryNavy
+                          : AppTheme.accentBlue,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: Icon(isPracticeMode ? Icons.school : Icons.play_arrow,
+                        size: 22),
+                    label: Text(
+                      isPracticeMode
+                          ? 'Start Practice Session'
+                          : 'Start Exam Simulation',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: _startSession,
+                  ),
+                ),
+                const SizedBox(height: 40),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10, left: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppTheme.accentBlue),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeCard({
+    required String title,
+    required String desc,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+    required bool isDark,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.accentBlue.withValues(alpha: 0.08)
+              : (isDark ? AppTheme.darkSurface : Colors.white),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.accentBlue
+                : (isDark ? AppTheme.darkBorder : AppTheme.border),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon,
+                    color: isSelected ? AppTheme.accentBlue : Colors.grey,
+                    size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: isSelected ? AppTheme.accentBlue : null,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              desc,
+              style: const TextStyle(
+                  fontSize: 13, color: AppTheme.secondaryText, height: 1.3),
+            ),
+          ],
         ),
       ),
     );

@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
+import 'package:uuid/uuid.dart';
 import '../models/question.dart';
 import '../models/exam.dart';
-import 'storage_service.dart';
 
 class ImportErrorDetail {
   final int row;
@@ -33,6 +33,7 @@ class ImportResult {
   final String targetExamName;
   final int startQuestionNumber;
   final int endQuestionNumber;
+  final int duplicateCount;
 
   ImportResult({
     required this.validQuestions,
@@ -44,9 +45,12 @@ class ImportResult {
     this.criticalErrors = const [],
     this.warnings = const [],
     this.suggestions = const [],
+    this.duplicateCount = 0,
   });
 
   int get validCount => validQuestions.length;
+  int get errorCount => criticalErrors.length;
+  int get warningCount => warnings.length;
 }
 
 class ImportService {
@@ -61,7 +65,8 @@ class ImportService {
     if (result == null || result.files.isEmpty) return null;
 
     final file = result.files.single;
-    final bytes = file.bytes ?? File(file.path!).readAsBytesSync();
+    final bytes = file.bytes ??
+        (file.path != null ? File(file.path!).readAsBytesSync() : <int>[]);
     final filename = file.name;
 
     final existingQuestions = targetExam?.questions
@@ -141,6 +146,14 @@ class ImportService {
     );
   }
 
+  static String _normalizeHeader(String header) {
+    return header
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[\s\-_\/]+'), '_')
+        .replaceAll(RegExp(r'^_+|_+$'), '');
+  }
+
   static ImportResult processRows(
     List<List<dynamic>> rows,
     String filename, {
@@ -153,6 +166,7 @@ class ImportService {
     final List<String> criticalErrors = [];
     final List<String> warnings = [];
     final List<String> suggestions = [];
+    int duplicateCount = 0;
 
     if (rows.isEmpty) {
       criticalErrors.add('File is completely empty.');
@@ -164,73 +178,112 @@ class ImportService {
       );
     }
 
-    // 1. Identify Headers
+    // 1. Identify Headers using normalized alias mapping
     Map<String, int> columnMap = {};
     int startRow = 0;
+
+    final questionAliases = {
+      'question',
+      'question_text',
+      'questiontext',
+      'q',
+      'prompt',
+      'item'
+    };
+    final typeAliases = {'question_type', 'type', 'qtype', 'item_type'};
+    final optAAliases = {
+      'option_a',
+      'option_1',
+      'choice_a',
+      'a',
+      'opt_a',
+      'choice_1'
+    };
+    final optBAliases = {
+      'option_b',
+      'option_2',
+      'choice_b',
+      'b',
+      'opt_b',
+      'choice_2'
+    };
+    final optCAliases = {
+      'option_c',
+      'option_3',
+      'choice_c',
+      'c',
+      'opt_c',
+      'choice_3'
+    };
+    final optDAliases = {
+      'option_d',
+      'option_4',
+      'choice_d',
+      'd',
+      'opt_d',
+      'choice_4'
+    };
+    final correctAliases = {
+      'correct_answer',
+      'correct_option',
+      'correct',
+      'answer',
+      'key',
+      'ans'
+    };
+    final expAAliases = {'explanation_a', 'exp_a', 'rationale_a'};
+    final expBAliases = {'explanation_b', 'exp_b', 'rationale_b'};
+    final expCAliases = {'explanation_c', 'exp_c', 'rationale_c'};
+    final expDAliases = {'explanation_d', 'exp_d', 'rationale_d'};
+    final expAliases = {'explanation', 'rationale', 'notes', 'feedback'};
+    final topicAliases = {'topic', 'category', 'subject', 'domain'};
+    final diffAliases = {'difficulty', 'level', 'diff'};
+    final tagAliases = {'tags', 'tag', 'keywords'};
+
     for (int i = 0; i < rows.length; i++) {
       if (rows[i].isEmpty) continue;
       bool foundQuestion = false;
       bool foundOption = false;
-      for (int c = 0; c < rows[i].length; c++) {
-        final val = rows[i][c].toString().trim().toLowerCase();
-        if (val.isEmpty) continue;
 
-        if (val == 'question_text' || val.contains('question') || val == 'q') {
+      for (int c = 0; c < rows[i].length; c++) {
+        final raw = rows[i][c].toString();
+        final norm = _normalizeHeader(raw);
+        if (norm.isEmpty) continue;
+
+        if (questionAliases.contains(norm)) {
           columnMap['question'] = c;
           foundQuestion = true;
-        } else if (val == 'question_type' || val == 'type') {
+        } else if (typeAliases.contains(norm)) {
           columnMap['question_type'] = c;
-        } else if (val == 'option_a' ||
-            val == 'option 1' ||
-            val == 'a' ||
-            val.contains('option a')) {
+        } else if (optAAliases.contains(norm)) {
           columnMap['option_a'] = c;
           foundOption = true;
-        } else if (val == 'option_b' ||
-            val == 'option 2' ||
-            val == 'b' ||
-            val.contains('option b')) {
+        } else if (optBAliases.contains(norm)) {
           columnMap['option_b'] = c;
           foundOption = true;
-        } else if (val == 'option_c' ||
-            val == 'option 3' ||
-            val == 'c' ||
-            val.contains('option c')) {
+        } else if (optCAliases.contains(norm)) {
           columnMap['option_c'] = c;
           foundOption = true;
-        } else if (val == 'option_d' ||
-            val == 'option 4' ||
-            val == 'd' ||
-            val.contains('option d')) {
+        } else if (optDAliases.contains(norm)) {
           columnMap['option_d'] = c;
           foundOption = true;
-        } else if (val == 'correct_answer' ||
-            val.contains('correct') ||
-            val.contains('answer')) {
+        } else if (correctAliases.contains(norm)) {
           columnMap['correct'] = c;
-        } else if (val == 'explanation_a' ||
-            val == 'explanation a' ||
-            val == 'exp_a') {
+        } else if (expAAliases.contains(norm)) {
           columnMap['explanation_a'] = c;
-        } else if (val == 'explanation_b' ||
-            val == 'explanation b' ||
-            val == 'exp_b') {
+        } else if (expBAliases.contains(norm)) {
           columnMap['explanation_b'] = c;
-        } else if (val == 'explanation_c' ||
-            val == 'explanation c' ||
-            val == 'exp_c') {
+        } else if (expCAliases.contains(norm)) {
           columnMap['explanation_c'] = c;
-        } else if (val == 'explanation_d' ||
-            val == 'explanation d' ||
-            val == 'exp_d') {
+        } else if (expDAliases.contains(norm)) {
           columnMap['explanation_d'] = c;
-        } else if (val.contains('explanation')) {
+        } else if (expAliases.contains(norm)) {
           columnMap['explanation'] = c;
-        } else if (val.contains('topic')) {
+        } else if (topicAliases.contains(norm)) {
           columnMap['topic'] = c;
-        } else if (val.contains('difficulty')) {
+        } else if (diffAliases.contains(norm)) {
           columnMap['difficulty'] = c;
-        } else if (val.contains('tag')) {
+        } else if (tagAliases.contains(norm)) {
           columnMap['tags'] = c;
         }
       }
@@ -241,6 +294,7 @@ class ImportService {
       }
     }
 
+    // Default positional fallback if no recognized header row found
     if (columnMap.isEmpty) {
       columnMap = {
         'question': 0,
@@ -263,7 +317,8 @@ class ImportService {
     // 2. Process Data Rows
     for (int i = startRow; i < rows.length; i++) {
       final r = rows[i];
-      if (r.isEmpty || r.every((element) => element.toString().trim().isEmpty)) {
+      if (r.isEmpty ||
+          r.every((element) => element.toString().trim().isEmpty)) {
         continue;
       }
 
@@ -291,7 +346,11 @@ class ImportService {
       final difficultyRaw = getCol('difficulty');
       final tagsRaw = getCol('tags');
 
-      if (qText.isEmpty && oA.isEmpty && oB.isEmpty && oC.isEmpty && oD.isEmpty) {
+      if (qText.isEmpty &&
+          oA.isEmpty &&
+          oB.isEmpty &&
+          oC.isEmpty &&
+          oD.isEmpty) {
         continue;
       }
 
@@ -308,25 +367,27 @@ class ImportService {
 
       final normQ = qText.toLowerCase();
       if (seenInThisFile.contains(normQ)) {
-        final err = 'Row $rowNum: Duplicate question detected in file ("$qText").';
+        duplicateCount++;
+        final err = 'Row $rowNum: Duplicate question in file ("$qText").';
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
-          problem: 'Duplicate question within CSV file',
-          suggestion: 'Remove or rename duplicate question',
+          problem: 'Duplicate question within file',
+          suggestion: 'Remove duplicate question row',
         ));
         continue;
       }
       seenInThisFile.add(normQ);
 
       if (existingInTarget.contains(normQ)) {
+        duplicateCount++;
         final warn =
             'Row $rowNum: Question already exists in target exam ("$qText").';
         warnings.add(warn);
         issues.add(ImportErrorDetail(
           row: rowNum,
           problem: 'Question already exists in target exam',
-          suggestion: 'Check if this question is intentional',
+          suggestion: 'Verify if this is an intentional repeat',
           isWarning: true,
         ));
       }
@@ -338,8 +399,8 @@ class ImportService {
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
-          problem: 'Missing one or more of options A/B/C/D',
-          suggestion: 'Ensure all 4 option columns have text',
+          problem: 'Missing one or more options A/B/C/D',
+          suggestion: 'Ensure all 4 option columns contain text',
         ));
         continue;
       }
@@ -351,24 +412,25 @@ class ImportService {
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
-          problem: 'Duplicate option texts',
-          suggestion: 'Ensure all 4 options are distinct',
+          problem: 'Duplicate option texts in same question',
+          suggestion: 'Ensure each of the 4 options is unique',
         ));
         continue;
       }
 
       if (correctRaw.isEmpty) {
-        final err = 'Row $rowNum: Missing correct answer.';
+        final err =
+            'Row $rowNum: Missing correct answer for question: "$qText"';
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
           problem: 'Missing correct answer',
-          suggestion: 'Specify correct answer (e.g., B or A|C)',
+          suggestion: 'Specify correct answer (e.g. A, B, C, D or A|C)',
         ));
         continue;
       }
 
-      // Parse Correct Answers (Supports single & multiple e.g. "A|C", "A, C", "1|3", "B")
+      // Parse Correct Answers (Supports single & multiple e.g. "A|C", "A, C", "1|3", "B", exact option text)
       final Set<int> parsedAnswers = {};
       final tokens = correctRaw
           .split(RegExp(r'[|;,/\s]+'))
@@ -386,7 +448,7 @@ class ImportService {
         } else if (token == 'd' || token == '4') {
           parsedAnswers.add(3);
         } else {
-          // Check if token matches option text exactly
+          // Exact match option text check
           for (int j = 0; j < 4; j++) {
             if (options[j].toLowerCase() == token) {
               parsedAnswers.add(j);
@@ -408,12 +470,12 @@ class ImportService {
 
       if (parsedAnswers.isEmpty) {
         final err =
-            'Row $rowNum: Invalid correct answer "$correctRaw". Must be A/B/C/D, 1/2/3/4, or option text (or combinations like A|C for multiple).';
+            'Row $rowNum: Invalid correct answer "$correctRaw". Must be A/B/C/D, 1/2/3/4, or option text (e.g. A|C for multi-select).';
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
-          problem: 'Invalid correct answer format "$correctRaw"',
-          suggestion: 'Use A, B, C, D, or A|C for multiple correct answers',
+          problem: 'Invalid correct answer value "$correctRaw"',
+          suggestion: 'Specify A, B, C, D or combinations like A|C',
         ));
         continue;
       }
@@ -431,7 +493,7 @@ class ImportService {
           diff = parsed;
         } else {
           warnings.add(
-              'Row $rowNum: Invalid difficulty "$difficultyRaw". Defaulting to 3.');
+              'Row $rowNum: Invalid difficulty "$difficultyRaw". Defaulted to 3.');
         }
       }
 
@@ -442,131 +504,125 @@ class ImportService {
       if (expC.isNotEmpty) explanations[2] = expC;
       if (expD.isNotEmpty) explanations[3] = expD;
 
-      // Fallback to generic explanation if individual option explanations not given
       if (explanations.isEmpty && genericExp.isNotEmpty) {
         for (var ans in parsedAnswers) {
           explanations[ans] = genericExp;
         }
       }
 
-      if (explanations.isEmpty) {
-        suggestions.add('Row $rowNum: Missing explanation.');
-      }
-      if (topic.isEmpty) suggestions.add('Row $rowNum: Missing topic.');
-      if (tagsRaw.isEmpty) suggestions.add('Row $rowNum: Missing tags.');
+      final List<String> tags = tagsRaw.isNotEmpty
+          ? tagsRaw
+              .split(RegExp(r'[,|;]+'))
+              .map((t) => t.trim())
+              .where((t) => t.isNotEmpty)
+              .toList()
+          : [];
 
-      List<String> tags = [];
-      if (tagsRaw.isNotEmpty) {
-        tags = tagsRaw
-            .split(RegExp(r'[;,]'))
-            .map((t) => t.trim())
-            .where((t) => t.isNotEmpty)
-            .toList();
-      }
-
-      final nextNum = startQuestionNumber + validQuestions.length;
-      final assignedId = 'Q$nextNum';
-
-      validQuestions.add(Question(
-        id: assignedId,
+      final currentDisplayNum = startQuestionNumber + validQuestions.length;
+      final newQuestion = Question(
+        id: const Uuid().v4(),
         question: qText,
         options: options,
         correctAnswers: parsedAnswers,
         questionType: questionType,
         optionExplanations: explanations,
-        topic: topic.isEmpty ? null : topic,
+        topic: topic.isNotEmpty ? topic : null,
         difficulty: diff,
         tags: tags,
-      ));
-    }
+        displayNumber: currentDisplayNum,
+      );
 
-    if (validQuestions.isEmpty && criticalErrors.isEmpty) {
-      criticalErrors.add('No valid questions found in file.');
+      validQuestions.add(newQuestion);
     }
-
-    final int startQ = startQuestionNumber;
-    final int endQ = validQuestions.isNotEmpty
-        ? startQuestionNumber + validQuestions.length - 1
-        : startQuestionNumber;
 
     return ImportResult(
       validQuestions: validQuestions,
-      filename: filename,
-      targetExamName: targetExamName,
-      startQuestionNumber: startQ,
-      endQuestionNumber: endQ,
       issues: issues,
       criticalErrors: criticalErrors,
       warnings: warnings,
       suggestions: suggestions,
+      filename: filename,
+      targetExamName: targetExamName,
+      startQuestionNumber: startQuestionNumber,
+      endQuestionNumber: startQuestionNumber + validQuestions.length - 1,
+      duplicateCount: duplicateCount,
     );
   }
 
-  static Future<String?> exportToCsvFile(Exam exam) async {
-    final List<List<dynamic>> rows = [];
-    rows.add([
-      'question_text',
-      'question_type',
-      'option_a',
-      'option_b',
-      'option_c',
-      'option_d',
-      'correct_answer',
-      'explanation_a',
-      'explanation_b',
-      'explanation_c',
-      'explanation_d',
-      'topic',
-      'difficulty',
-      'tags'
-    ]);
+  static String getSampleCsvTemplate() {
+    return '''question,option_a,option_b,option_c,option_d,correct_answer,question_type,topic,difficulty,tags,explanation_a,explanation_b,explanation_c,explanation_d
+"What is the primary key in a database?","A unique identifier for each record","A foreign key from another table","An index for full text search","A temporary query variable","A","single","Databases",2,"SQL, DB","Correct: primary keys uniquely identify records","Incorrect","Incorrect","Incorrect"
+"Which of the following are cloud providers? (Select all that apply)","Amazon Web Services (AWS)","Microsoft Windows 11","Google Cloud Platform (GCP)","Apple macOS","A|C","multiple","Cloud Computing",3,"Cloud, Infrastructure","AWS is a major cloud provider","Windows 11 is an OS","GCP is a major cloud provider","macOS is an OS"''';
+  }
 
-    for (var q in exam.questions) {
-      final correctChars = q.correctAnswers
-          .map((idx) => ['A', 'B', 'C', 'D'][idx])
+  static Future<String?> exportToCsvFile(Exam exam) async {
+    final List<List<dynamic>> rows = [
+      [
+        'question',
+        'option_a',
+        'option_b',
+        'option_c',
+        'option_d',
+        'correct_answer',
+        'question_type',
+        'topic',
+        'difficulty',
+        'tags',
+        'explanation_a',
+        'explanation_b',
+        'explanation_c',
+        'explanation_d',
+      ]
+    ];
+
+    for (final q in exam.questions) {
+      final oA = q.options.isNotEmpty ? q.options[0] : '';
+      final oB = q.options.length > 1 ? q.options[1] : '';
+      final oC = q.options.length > 2 ? q.options[2] : '';
+      final oD = q.options.length > 3 ? q.options[3] : '';
+
+      final correctLetters = q.correctAnswers
+          .map((idx) => String.fromCharCode(65 + idx))
           .join('|');
+
+      final expA = q.optionExplanations[0] ?? '';
+      final expB = q.optionExplanations[1] ?? '';
+      final expC = q.optionExplanations[2] ?? '';
+      final expD = q.optionExplanations[3] ?? '';
+
       rows.add([
         q.question,
+        oA,
+        oB,
+        oC,
+        oD,
+        correctLetters,
         q.questionType,
-        q.options.isNotEmpty ? q.options[0] : '',
-        q.options.length > 1 ? q.options[1] : '',
-        q.options.length > 2 ? q.options[2] : '',
-        q.options.length > 3 ? q.options[3] : '',
-        correctChars,
-        q.optionExplanations[0] ?? '',
-        q.optionExplanations[1] ?? '',
-        q.optionExplanations[2] ?? '',
-        q.optionExplanations[3] ?? '',
         q.topic ?? '',
-        q.difficulty.toString(),
-        q.tags.join(';')
+        q.difficulty,
+        q.tags.join(', '),
+        expA,
+        expB,
+        expC,
+        expD,
       ]);
     }
 
-    final csv = const ListToCsvConverter().convert(rows);
+    final csvString = const ListToCsvConverter().convert(rows);
 
-    try {
-      final suggested = "${exam.name.replaceAll(' ', '_')}_${exam.id}.csv";
-      final path = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save exam as CSV',
-        fileName: suggested,
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      if (path != null) {
-        final f = File(path);
-        f.writeAsStringSync(csv);
-        return f.path;
-      }
-    } catch (e) {
-      // fallback
+    final sanitizedName = exam.name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    final outputFile = await FilePicker.platform.saveFile(
+      dialogTitle: 'Export Exam to CSV',
+      fileName: '${sanitizedName}_questions.csv',
+      type: FileType.custom,
+      allowedExtensions: ['csv'],
+    );
+
+    if (outputFile != null) {
+      final file = File(outputFile);
+      await file.writeAsString(csvString);
+      return outputFile;
     }
-
-    final downloads = await StorageService.getDownloadsDirectory();
-    final file =
-        File("${downloads.path}/${exam.name.replaceAll(' ', '_')}_${exam.id}.csv");
-    file.writeAsStringSync(csv);
-    return file.path;
+    return null;
   }
 }
-

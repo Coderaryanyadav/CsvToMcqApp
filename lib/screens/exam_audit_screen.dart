@@ -1,11 +1,50 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 
 import '../models/exam.dart';
-import '../models/question.dart';
 import '../services/storage_service.dart';
+import '../utils/validators.dart';
 import 'add_edit_exam_screen.dart';
+
+enum AuditSeverity { critical, warning, suggestion }
+
+class AuditFinding {
+  final AuditSeverity severity;
+  final String title;
+  final String details;
+
+  const AuditFinding({
+    required this.severity,
+    required this.title,
+    required this.details,
+  });
+}
+
+class ExamAuditResult {
+  final String examId;
+  final String examName;
+  final int totalQuestions;
+  final List<AuditFinding> findings;
+  final Map<int, int> difficultySpread;
+  final Map<String, int> topicSpread;
+  final double readinessScore;
+
+  const ExamAuditResult({
+    required this.examId,
+    required this.examName,
+    required this.totalQuestions,
+    required this.findings,
+    required this.difficultySpread,
+    required this.topicSpread,
+    required this.readinessScore,
+  });
+
+  int get criticalCount =>
+      findings.where((f) => f.severity == AuditSeverity.critical).length;
+  int get warningCount =>
+      findings.where((f) => f.severity == AuditSeverity.warning).length;
+  int get suggestionCount =>
+      findings.where((f) => f.severity == AuditSeverity.suggestion).length;
+}
 
 class ExamAuditScreen extends StatefulWidget {
   const ExamAuditScreen({super.key});
@@ -15,9 +54,9 @@ class ExamAuditScreen extends StatefulWidget {
 }
 
 class _ExamAuditScreenState extends State<ExamAuditScreen> {
-  bool loading = true;
-  String? error;
-  List<_ExamAuditResult> audits = [];
+  bool _loading = true;
+  String? _error;
+  List<ExamAuditResult> _audits = [];
 
   @override
   void initState() {
@@ -27,119 +66,249 @@ class _ExamAuditScreenState extends State<ExamAuditScreen> {
 
   Future<void> _runAudit() async {
     setState(() {
-      loading = true;
-      error = null;
+      _loading = true;
+      _error = null;
     });
+
     try {
       await StorageService.init();
-      final files = StorageService.listExamFiles();
-      final List<_ExamAuditResult> results = [];
-      for (final entity in files) {
-        final filename = entity.path.split(Platform.pathSeparator).last;
+      final exams = await StorageService.loadAllExams();
+      final List<ExamAuditResult> results = [];
+
+      for (final exam in exams) {
         try {
-          final json = await StorageService.readExamFile(filename);
-          final exam = Exam.fromJson(json);
-          results.add(_auditExam(exam));
+          results.add(_performExamAudit(exam));
         } catch (e) {
           results.add(
-            _ExamAuditResult.error(
-              filename.replaceAll('.json', ''),
-              'Failed to audit: $e',
+            ExamAuditResult(
+              examId: exam.id,
+              examName: exam.name,
+              totalQuestions: 0,
+              findings: [
+                AuditFinding(
+                  severity: AuditSeverity.critical,
+                  title: 'Corrupted Exam',
+                  details: 'Failed to audit exam: $e',
+                ),
+              ],
+              difficultySpread: const {},
+              topicSpread: const {},
+              readinessScore: 0.0,
             ),
           );
         }
       }
-      results.sort(
-        (a, b) => b.completenessScore.compareTo(a.completenessScore),
-      );
+
+      results.sort((a, b) => b.readinessScore.compareTo(a.readinessScore));
+
       if (!mounted) return;
       setState(() {
-        audits = results;
-        loading = false;
+        _audits = results;
+        _loading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        error = e.toString();
-        loading = false;
+        _error = e.toString();
+        _loading = false;
       });
     }
   }
 
-  _ExamAuditResult _auditExam(Exam exam) {
+  ExamAuditResult _performExamAudit(Exam exam) {
+    final findings = <AuditFinding>[];
     final total = exam.questions.length;
-    if (total == 0) {
-      return _ExamAuditResult(
-        examId: exam.id,
-        examName: exam.name,
-        totalQuestions: 0,
-        missingExplanations: 0,
-        missingTopics: 0,
-        missingTags: 0,
-        duplicateQuestions: const [],
-        difficultyBuckets: const {},
-        actionItems: const ['Add questions to this exam.'],
-        completenessScore: 0,
+
+    // Check Exam Metadata
+    final examErrors = ExamValidator.validate(exam);
+    for (final err in examErrors) {
+      findings.add(
+        AuditFinding(
+          severity: AuditSeverity.critical,
+          title: 'Exam Validation Issue',
+          details: err,
+        ),
       );
     }
 
-    final missingExp = exam.questions
-        .where((q) => q.explanation == null || q.explanation!.trim().isEmpty)
-        .length;
-    final missingTopics =
-        exam.questions.where((q) => q.topic == null || q.topic!.trim().isEmpty).length;
-    final missingTags =
-        exam.questions.where((q) => q.tags.isEmpty).length;
+    if (total == 0) {
+      findings.add(
+        const AuditFinding(
+          severity: AuditSeverity.critical,
+          title: 'No Questions',
+          details:
+              'This exam contains 0 questions. Add questions before publishing.',
+        ),
+      );
+      return ExamAuditResult(
+        examId: exam.id,
+        examName: exam.name,
+        totalQuestions: 0,
+        findings: findings,
+        difficultySpread: const {},
+        topicSpread: const {},
+        readinessScore: 0.0,
+      );
+    }
 
-    final duplicates = <String>[];
-    final seen = <String, Question>{};
-    for (final q in exam.questions) {
-      final norm = q.question.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
-      if (norm.isEmpty) continue;
-      if (seen.containsKey(norm)) {
-        duplicates.add(q.question);
-      } else {
-        seen[norm] = q;
+    // Question-level validation
+    int invalidQuestions = 0;
+    int missingExplanations = 0;
+    int missingTopics = 0;
+    int missingTags = 0;
+    int veryLongContent = 0;
+
+    final seenQuestions = <String, int>{};
+    final difficultySpread = <int, int>{};
+    final topicSpread = <String, int>{};
+
+    for (var i = 0; i < exam.questions.length; i++) {
+      final q = exam.questions[i];
+      final qIndex = i + 1;
+
+      // Critical Question Validator errors
+      final qErrors = QuestionValidator.validate(q);
+      if (qErrors.isNotEmpty) {
+        invalidQuestions++;
+        findings.add(
+          AuditFinding(
+            severity: AuditSeverity.critical,
+            title: 'Q$qIndex Invalid',
+            details: qErrors.join(', '),
+          ),
+        );
       }
+
+      // Check Duplicates
+      final norm =
+          q.question.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+      if (norm.isNotEmpty) {
+        if (seenQuestions.containsKey(norm)) {
+          findings.add(
+            AuditFinding(
+              severity: AuditSeverity.critical,
+              title: 'Duplicate Question',
+              details:
+                  'Q$qIndex duplicates Q${seenQuestions[norm]}: "${q.question.length > 50 ? '${q.question.substring(0, 50)}...' : q.question}"',
+            ),
+          );
+        } else {
+          seenQuestions[norm] = qIndex;
+        }
+      }
+
+      // Warnings
+      if (q.explanation == null || q.explanation!.trim().isEmpty) {
+        missingExplanations++;
+      }
+      if (q.topic == null || q.topic!.trim().isEmpty) {
+        missingTopics++;
+      } else {
+        topicSpread[q.topic!.trim()] = (topicSpread[q.topic!.trim()] ?? 0) + 1;
+      }
+      if (q.tags.isEmpty) {
+        missingTags++;
+      }
+      if (q.question.length > 500) {
+        veryLongContent++;
+      }
+
+      // Difficulty spread
+      difficultySpread[q.difficulty] =
+          (difficultySpread[q.difficulty] ?? 0) + 1;
     }
 
-    final difficultyBuckets = <int, int>{};
-    for (var i = 1; i <= 5; i++) {
-      difficultyBuckets[i] = exam.questions.where((q) => q.difficulty == i).length;
-    }
-
-    final issues = <String>[];
-    if (missingExp > 0) {
-      issues.add('$missingExp missing explanations');
+    if (missingExplanations > 0) {
+      findings.add(
+        AuditFinding(
+          severity: AuditSeverity.warning,
+          title: 'Missing Explanations ($missingExplanations/$total)',
+          details:
+              'Explanations significantly boost student comprehension and learning.',
+        ),
+      );
     }
     if (missingTopics > 0) {
-      issues.add('$missingTopics missing topics');
+      findings.add(
+        AuditFinding(
+          severity: AuditSeverity.warning,
+          title: 'Missing Topics ($missingTopics/$total)',
+          details:
+              'Assign topics to allow category-based filtering and weak-area analytics.',
+        ),
+      );
     }
     if (missingTags > 0) {
-      issues.add('$missingTags uncategorized questions');
+      findings.add(
+        AuditFinding(
+          severity: AuditSeverity.warning,
+          title: 'Uncategorized Tags ($missingTags/$total)',
+          details: 'Tags help cross-cutting search and practice modes.',
+        ),
+      );
     }
-    if (duplicates.isNotEmpty) {
-      issues.add('${duplicates.length} duplicate question(s)');
+    if (veryLongContent > 0) {
+      findings.add(
+        AuditFinding(
+          severity: AuditSeverity.warning,
+          title: 'Very Long Questions ($veryLongContent)',
+          details:
+              'Some questions exceed 500 characters. Check readability on mobile screens.',
+        ),
+      );
     }
 
-    final completenessPenalty = (missingExp + missingTopics + missingTags) / (total * 3);
-    final completenessScore = (1 - completenessPenalty).clamp(0.0, 1.0);
-
-    if (issues.isEmpty) {
-      issues.add('All checks passed.');
+    // Suggestions
+    if (difficultySpread.keys.length < 2 && total >= 10) {
+      findings.add(
+        const AuditFinding(
+          severity: AuditSeverity.suggestion,
+          title: 'Difficulty Diversity',
+          details:
+              'Consider varying difficulty levels (Easy, Medium, Hard) for better assessment balance.',
+        ),
+      );
+    }
+    if (topicSpread.keys.length < 2 && total >= 10) {
+      findings.add(
+        const AuditFinding(
+          severity: AuditSeverity.suggestion,
+          title: 'Topic Diversity',
+          details:
+              'All questions belong to a single topic. Adding more topics helps granular learning tracking.',
+        ),
+      );
     }
 
-    return _ExamAuditResult(
+    // Calculate readiness score
+    double score = 1.0;
+    if (invalidQuestions > 0) {
+      score -= (invalidQuestions / total) * 0.5;
+    }
+    if (seenQuestions.length < total) {
+      final duplicatesCount = total - seenQuestions.length;
+      score -= (duplicatesCount / total) * 0.3;
+    }
+    if (missingExplanations > 0) {
+      score -= (missingExplanations / total) * 0.15;
+    }
+    if (missingTopics > 0) {
+      score -= (missingTopics / total) * 0.1;
+    }
+    if (examErrors.isNotEmpty) {
+      score -= 0.3;
+    }
+
+    final finalScore = (score.clamp(0.0, 1.0) * 100).roundToDouble() / 100.0;
+
+    return ExamAuditResult(
       examId: exam.id,
       examName: exam.name,
       totalQuestions: total,
-      missingExplanations: missingExp,
-      missingTopics: missingTopics,
-      missingTags: missingTags,
-      duplicateQuestions: duplicates,
-      difficultyBuckets: difficultyBuckets,
-      actionItems: issues,
-      completenessScore: double.parse(completenessScore.toStringAsFixed(2)),
+      findings: findings,
+      difficultySpread: difficultySpread,
+      topicSpread: topicSpread,
+      readinessScore: finalScore,
     );
   }
 
@@ -156,201 +325,87 @@ class _ExamAuditScreenState extends State<ExamAuditScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Exam Audit'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Exam Quality Audit'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Rerun Audit',
+            onPressed: _runAudit,
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _runAudit,
-        child: loading
+        child: _loading
             ? const Center(child: CircularProgressIndicator())
-            : error != null
-                ? ListView(
-                    padding: const EdgeInsets.all(24),
-                    children: [
-                      Card(
-                        color: Colors.red.shade50,
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Text(
-                            error!,
-                            style: TextStyle(color: Colors.red.shade700),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : audits.isEmpty
-                    ? ListView(
-                        padding: const EdgeInsets.all(24),
+            : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(24),
-                              child: Column(
-                                children: [
-                                  Icon(Icons.fact_check_outlined,
-                                      size: 48, color: Colors.deepPurple.shade200),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'No exams found',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Upload or create an exam first to run the audit.',
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ],
-                              ),
-                            ),
+                          Icon(Icons.error_outline_rounded,
+                              size: 48, color: colorScheme.error),
+                          const SizedBox(height: 12),
+                          Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: colorScheme.error),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton.tonal(
+                            onPressed: _runAudit,
+                            child: const Text('Retry'),
                           ),
                         ],
+                      ),
+                    ),
+                  )
+                : _audits.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.fact_check_outlined,
+                                size: 56,
+                                color: colorScheme.onSurfaceVariant
+                                    .withValues(alpha: 0.5),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'No exams to audit',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Import or create an exam to run quality and readiness checks.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    color: colorScheme.onSurfaceVariant),
+                              ),
+                            ],
+                          ),
+                        ),
                       )
                     : ListView.builder(
                         padding: const EdgeInsets.all(16),
-                        itemCount: audits.length,
+                        itemCount: _audits.length,
                         itemBuilder: (context, index) {
-                          final audit = audits[index];
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 16),
-                            elevation: 3,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              audit.examName,
-                                              style: const TextStyle(
-                                                fontSize: 18,
-                                                fontWeight: FontWeight.w600,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 4),
-                                            Text(
-                                              '${audit.totalQuestions} questions',
-                                              style: TextStyle(
-                                                color: Colors.grey.shade600,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      ElevatedButton.icon(
-                                        onPressed: audit.totalQuestions == 0
-                                            ? null
-                                            : () => _openEditor(audit.examId),
-                                        icon: const Icon(Icons.build_outlined, size: 18),
-                                        label: const Text('Fix'),
-                                      )
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  LinearProgressIndicator(
-                                    value: audit.completenessScore,
-                                    minHeight: 8,
-                                    backgroundColor: Colors.grey.shade200,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      audit.completenessScore > 0.8
-                                          ? Colors.green
-                                          : audit.completenessScore > 0.5
-                                              ? Colors.orange
-                                              : Colors.red,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Readiness ${(audit.completenessScore * 100).toStringAsFixed(0)}%',
-                                    style: TextStyle(color: Colors.grey.shade700),
-                                  ),
-                                  const Divider(height: 24),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: audit.actionItems
-                                        .map(
-                                          (item) => Chip(
-                                            label: Text(item),
-                                            backgroundColor: item == 'All checks passed.'
-                                                ? Colors.green.shade50
-                                                : Colors.orange.shade50,
-                                            labelStyle: TextStyle(
-                                              color: item == 'All checks passed.'
-                                                  ? Colors.green.shade700
-                                                  : Colors.orange.shade700,
-                                            ),
-                                          ),
-                                        )
-                                        .toList(),
-                                  ),
-                                  if (audit.difficultyBuckets.isNotEmpty) ...[
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Difficulty spread',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.grey.shade800,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Wrap(
-                                      spacing: 8,
-                                      children: audit.difficultyBuckets.entries
-                                          .map(
-                                            (entry) => Chip(
-                                              avatar: CircleAvatar(
-                                                backgroundColor: Colors.deepPurple.shade100,
-                                                child: Text(
-                                                  entry.key.toString(),
-                                                  style: const TextStyle(fontSize: 12),
-                                                ),
-                                              ),
-                                              label: Text('${entry.value}'),
-                                            ),
-                                          )
-                                          .toList(),
-                                    ),
-                                  ],
-                                  if (audit.duplicateQuestions.isNotEmpty) ...[
-                                    const SizedBox(height: 16),
-                                    Text(
-                                      'Duplicates detected',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        color: Colors.red.shade700,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    ...audit.duplicateQuestions.take(3).map(
-                                          (q) => Text(
-                                            '• $q',
-                                            style: TextStyle(color: Colors.red.shade600),
-                                          ),
-                                        ),
-                                    if (audit.duplicateQuestions.length > 3)
-                                      Text(
-                                        '+ ${audit.duplicateQuestions.length - 3} more',
-                                        style: TextStyle(color: Colors.red.shade600),
-                                      ),
-                                  ],
-                                ],
-                              ),
-                            ),
+                          final audit = _audits[index];
+                          return _ExamAuditCard(
+                            audit: audit,
+                            onFix: () => _openEditor(audit.examId),
                           );
                         },
                       ),
@@ -359,44 +414,240 @@ class _ExamAuditScreenState extends State<ExamAuditScreen> {
   }
 }
 
-class _ExamAuditResult {
-  final String examId;
-  final String examName;
-  final int totalQuestions;
-  final int missingExplanations;
-  final int missingTopics;
-  final int missingTags;
-  final List<String> duplicateQuestions;
-  final Map<int, int> difficultyBuckets;
-  final List<String> actionItems;
-  final double completenessScore;
+class _ExamAuditCard extends StatelessWidget {
+  final ExamAuditResult audit;
+  final VoidCallback onFix;
 
-  const _ExamAuditResult({
-    required this.examId,
-    required this.examName,
-    required this.totalQuestions,
-    required this.missingExplanations,
-    required this.missingTopics,
-    required this.missingTags,
-    required this.duplicateQuestions,
-    required this.difficultyBuckets,
-    required this.actionItems,
-    required this.completenessScore,
+  const _ExamAuditCard({
+    required this.audit,
+    required this.onFix,
   });
 
-  factory _ExamAuditResult.error(String examId, String message) {
-    return _ExamAuditResult(
-      examId: examId,
-      examName: examId,
-      totalQuestions: 0,
-      missingExplanations: 0,
-      missingTopics: 0,
-      missingTags: 0,
-      duplicateQuestions: const [],
-      difficultyBuckets: const {},
-      actionItems: [message],
-      completenessScore: 0,
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final readinessPercent = (audit.readinessScore * 100).toInt();
+
+    Color readinessColor = Colors.green;
+    if (readinessPercent < 50) {
+      readinessColor = Colors.red;
+    } else if (readinessPercent < 80) {
+      readinessColor = Colors.orange;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        audit.examName,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${audit.totalQuestions} questions',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onFix,
+                  icon: const Icon(Icons.edit_rounded, size: 16),
+                  label: const Text('Edit / Fix'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: audit.readinessScore,
+                      minHeight: 8,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      valueColor: AlwaysStoppedAnimation<Color>(readinessColor),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  '$readinessPercent% Ready',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: readinessColor,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (audit.criticalCount > 0)
+                  _BadgeChip(
+                    label: '${audit.criticalCount} Critical',
+                    icon: Icons.error_rounded,
+                    color: Colors.red,
+                  ),
+                if (audit.warningCount > 0)
+                  _BadgeChip(
+                    label: '${audit.warningCount} Warnings',
+                    icon: Icons.warning_amber_rounded,
+                    color: Colors.amber.shade800,
+                  ),
+                if (audit.suggestionCount > 0)
+                  _BadgeChip(
+                    label: '${audit.suggestionCount} Suggestions',
+                    icon: Icons.lightbulb_outline_rounded,
+                    color: Colors.blue,
+                  ),
+                if (audit.findings.isEmpty)
+                  const _BadgeChip(
+                    label: 'Clean — Ready for Students',
+                    icon: Icons.check_circle_outline_rounded,
+                    color: Colors.green,
+                  ),
+              ],
+            ),
+            if (audit.findings.isNotEmpty) ...[
+              const Divider(height: 24),
+              ...audit.findings.map(
+                (f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        f.severity == AuditSeverity.critical
+                            ? Icons.cancel_rounded
+                            : f.severity == AuditSeverity.warning
+                                ? Icons.warning_rounded
+                                : Icons.info_outline_rounded,
+                        size: 16,
+                        color: f.severity == AuditSeverity.critical
+                            ? Colors.red
+                            : f.severity == AuditSeverity.warning
+                                ? Colors.amber.shade800
+                                : Colors.blue,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: RichText(
+                          text: TextSpan(
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurface,
+                            ),
+                            children: [
+                              TextSpan(
+                                text: '${f.title}: ',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
+                              ),
+                              TextSpan(text: f.details),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            if (audit.difficultySpread.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Difficulty Distribution',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                children: audit.difficultySpread.entries.map((entry) {
+                  final label = entry.key == 1
+                      ? 'Easy'
+                      : entry.key == 2
+                          ? 'Medium'
+                          : entry.key == 3
+                              ? 'Hard'
+                              : 'Level ${entry.key}';
+                  return Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text('$label: ${entry.value}'),
+                    padding: EdgeInsets.zero,
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
+class _BadgeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _BadgeChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

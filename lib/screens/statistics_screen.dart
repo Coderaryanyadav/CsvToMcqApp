@@ -1,11 +1,10 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import '../models/exam.dart';
-import '../models/question.dart';
 import '../models/performance.dart';
 import '../services/analytics_service.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme.dart';
+import 'practice_mode_screen.dart';
 
 class StatisticsScreen extends StatefulWidget {
   const StatisticsScreen({super.key});
@@ -19,519 +18,547 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Map<String, dynamic> overview = const {
     'totalExams': 0,
     'averageScore': 0.0,
+    'totalQuestions': 0,
     'totalCorrect': 0,
+    'totalTimeSeconds': 0,
+    'averageTimePerQuestion': 0.0,
     'improvement': 0.0,
+    'passRate': 0.0,
   };
   List<ExamPerformance> performances = [];
-  List<_ExamSummary> examSummaries = [];
-  List<_TopicInsight> topicInsights = [];
+  List<Exam> allExams = [];
+  Map<String, TopicStat> topicStats = {};
+  Map<int, DifficultyStat> diffStats = {};
+  List<Map<String, dynamic>> trendData = [];
 
   @override
   void initState() {
     super.initState();
-    _load();
+    _loadData();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      loading = true;
-    });
-    try {
-      await StorageService.init();
-    } catch (_) {}
+  Future<void> _loadData() async {
+    setState(() => loading = true);
+    final exams = await StorageService.loadAllExams();
     final allPerformances = StorageService.loadAllPerformances();
     final stats = AnalyticsService.getOverallStats();
-    final questionsById = await _buildQuestionLookup();
-    final insights = _buildTopicInsights(allPerformances, questionsById);
-    final summaries = _buildExamSummaries(allPerformances);
+    final topics = AnalyticsService.getTopicBreakdown(exams);
+    final diffs = AnalyticsService.getDifficultyBreakdown(exams);
+    final trend = AnalyticsService.getChronologicalTrend();
+
     if (!mounted) return;
     setState(() {
-      overview = stats;
+      allExams = exams;
       performances = allPerformances;
-      topicInsights = insights;
-      examSummaries = summaries;
+      overview = stats;
+      topicStats = topics;
+      diffStats = diffs;
+      trendData = trend;
       loading = false;
     });
   }
 
-  Future<Map<String, Question>> _buildQuestionLookup() async {
-    final lookup = <String, Question>{};
-    final files = StorageService.listExamFiles();
-    for (final entity in files) {
-      final filename = entity.path.split(Platform.pathSeparator).last;
-      try {
-        final json = await StorageService.readExamFile(filename);
-        final exam = Exam.fromJson(json);
-        for (final question in exam.questions) {
-          lookup[question.id] = question;
-        }
-      } catch (_) {
-        // ignore unreadable exam files during analytics
-      }
-    }
-    return lookup;
-  }
-
-  List<_TopicInsight> _buildTopicInsights(
-    List<ExamPerformance> allPerformances,
-    Map<String, Question> questions,
-  ) {
-    final Map<String, _TopicCounter> counters = {};
-    for (final perf in allPerformances) {
-      perf.questionResults.forEach((questionId, correct) {
-        final question = questions[questionId];
-        final topic =
-            (question?.topic?.trim().isNotEmpty ?? false) ? question!.topic!.trim() : 'General';
-        counters.putIfAbsent(topic, () => _TopicCounter()).register(correct);
-      });
-    }
-    final insights = counters.entries
-        .map(
-          (entry) => _TopicInsight(
-            topic: entry.key,
-            accuracy: entry.value.accuracy,
-            attempts: entry.value.total,
-          ),
-        )
+  void _practiceTopic(String topic) {
+    final matchingQuestions = allExams
+        .expand((e) => e.questions)
+        .where((q) => q.topic == topic)
         .toList();
-    insights.sort((a, b) => a.accuracy.compareTo(b.accuracy));
-    return insights;
-  }
 
-  List<_ExamSummary> _buildExamSummaries(List<ExamPerformance> allPerformances) {
-    final Map<String, _ExamAggregate> aggregates = {};
-    for (final perf in allPerformances) {
-      aggregates.putIfAbsent(
-        perf.examId,
-        () => _ExamAggregate(examId: perf.examId, examName: perf.examName),
-      ).record(perf);
+    if (matchingQuestions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No questions found for topic "$topic".')),
+      );
+      return;
     }
-    final summaries = aggregates.values
-        .map(
-          (agg) => _ExamSummary(
-            examId: agg.examId,
-            examName: agg.examName,
-            attempts: agg.attempts,
-            averageScore: agg.totalScore / agg.attempts,
-            bestScore: agg.bestScore,
-            lastTaken: agg.lastTaken,
-          ),
-        )
-        .toList();
-    summaries.sort((a, b) => b.lastTaken.compareTo(a.lastTaken));
-    return summaries;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PracticeModeScreen(
+          questions: matchingQuestions,
+          examName: '$topic - Targeted Practice',
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    if (loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Performance & Analytics')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final totalAttempts = (overview['totalExams'] as num?)?.toInt() ?? 0;
+    final avgScore = (overview['averageScore'] as num?)?.toDouble() ?? 0.0;
+    final improvement = (overview['improvement'] as num?)?.toDouble() ?? 0.0;
+    final totalQ = (overview['totalQuestions'] as num?)?.toInt() ?? 0;
+    final passRate = (overview['passRate'] as num?)?.toDouble() ?? 0.0;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Statistics & Analytics'),
-        backgroundColor: Colors.deepPurple,
+        title: const Text('Performance & Analytics'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+            onPressed: _loadData,
+          ),
+        ],
       ),
-      body: loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                children: [
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+      body: performances.isEmpty
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.analytics_outlined,
+                          size: 56, color: AppTheme.accentBlue),
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
+                    const SizedBox(height: 20),
+                    const Text(
+                      'No Exam Activity Yet',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Complete practice sessions or exam simulations to unlock detailed analytics.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                          color: AppTheme.secondaryText, fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1000),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 1. OVERALL STATS HERO
+                      Row(
                         children: [
-                          const Text(
-                            'Overall Performance',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: _buildKpiCard(
+                              title: 'Average Score',
+                              value: '${avgScore.toStringAsFixed(1)}%',
+                              subtitle: totalAttempts == 1
+                                  ? 'Based on 1 attempt'
+                                  : (improvement >= 0
+                                      ? '+${improvement.toStringAsFixed(1)}% trend'
+                                      : '${improvement.toStringAsFixed(1)}% trend'),
+                              icon: Icons.speed,
+                              color: AppTheme.accentBlue,
+                              isDark: isDark,
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
-                            children: [
-                              _StatItem(
-                                label: 'Total Exams',
-                                value: '${overview['totalExams']}',
-                                icon: Icons.quiz,
-                                color: Colors.blue,
-                              ),
-                              _StatItem(
-                                label: 'Avg Score',
-                                value:
-                                    '${(overview['averageScore'] as double).toStringAsFixed(1)}%',
-                                icon: Icons.trending_up,
-                                color: Colors.green,
-                              ),
-                              _StatItem(
-                                label: 'Correct',
-                                value: '${overview['totalCorrect']}',
-                                icon: Icons.check_circle,
-                                color: Colors.teal,
-                              ),
-                            ],
-                          ),
-                          if ((overview['improvement'] as double) != 0.0) ...[
-                            const SizedBox(height: 20),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: (overview['improvement'] as double) > 0
-                                    ? Colors.green.shade50
-                                    : Colors.red.shade50,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    (overview['improvement'] as double) > 0
-                                        ? Icons.arrow_upward
-                                        : Icons.arrow_downward,
-                                    color: (overview['improvement'] as double) > 0
-                                        ? Colors.green
-                                        : Colors.red,
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '${(overview['improvement'] as double) > 0 ? '+' : ''}${(overview['improvement'] as double).toStringAsFixed(1)}% improvement',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: (overview['improvement'] as double) > 0
-                                          ? Colors.green.shade900
-                                          : Colors.red.shade900,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildKpiCard(
+                              title: 'Pass Rate',
+                              value: '${passRate.toStringAsFixed(0)}%',
+                              subtitle: '$totalAttempts total attempts',
+                              icon: Icons.check_circle_outline,
+                              color: AppTheme.success,
+                              isDark: isDark,
                             ),
-                          ],
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: _buildKpiCard(
+                              title: 'Questions Answered',
+                              value: '$totalQ',
+                              subtitle: '${overview['totalCorrect']} correct',
+                              icon: Icons.quiz_outlined,
+                              color: AppTheme.primaryNavy,
+                              isDark: isDark,
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (topicInsights.isNotEmpty) ...[
-                    const Text(
-                      'Weak Topics',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: topicInsights
-                          .take(8)
-                          .map(
-                            (insight) => Chip(
-                              avatar: Icon(
-                                insight.accuracy >= 0.75
-                                    ? Icons.check_circle
-                                    : insight.accuracy >= 0.5
-                                        ? Icons.trending_down
-                                        : Icons.warning,
-                                size: 16,
-                                color: insight.accuracy >= 0.75
-                                    ? Colors.green
-                                    : insight.accuracy >= 0.5
-                                        ? Colors.amber
-                                        : Colors.red,
-                              ),
-                              label: Text(
-                                '${insight.topic} • ${(insight.accuracy * 100).toStringAsFixed(0)}%',
-                              ),
-                              backgroundColor: insight.accuracy >= 0.75
-                                  ? Colors.green.shade50
-                                  : insight.accuracy >= 0.5
-                                      ? Colors.amber.shade50
-                                      : Colors.red.shade50,
-                            ),
-                          )
-                          .toList(),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  if (examSummaries.isNotEmpty) ...[
-                    const Text(
-                      'Exam Health',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 8),
-                    ...examSummaries.take(5).map(
-                          (summary) => Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    summary.examName,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Row(
+                      const SizedBox(height: 32),
+
+                      // 2. CHRONOLOGICAL TREND
+                      _sectionTitle(
+                          'Chronological Score History (Oldest → Newest)'),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ListView.separated(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: trendData.length,
+                                separatorBuilder: (_, __) =>
+                                    const Divider(height: 16),
+                                itemBuilder: (context, idx) {
+                                  final item = trendData[idx];
+                                  final date = item['date'] as DateTime;
+                                  final score =
+                                      (item['score'] as num).toDouble();
+                                  final passed = item['passed'] == true;
+
+                                  return Row(
                                     children: [
-                                      Expanded(
-                                        child: _MiniStat(
-                                          label: 'Avg',
-                                          value: '${summary.averageScore.toStringAsFixed(1)}%',
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: (passed
+                                                  ? AppTheme.success
+                                                  : AppTheme.danger)
+                                              .withValues(alpha: 0.1),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            '#${idx + 1}',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 12,
+                                              color: passed
+                                                  ? AppTheme.success
+                                                  : AppTheme.danger,
+                                            ),
+                                          ),
                                         ),
                                       ),
+                                      const SizedBox(width: 14),
                                       Expanded(
-                                        child: _MiniStat(
-                                          label: 'Best',
-                                          value: '${summary.bestScore.toStringAsFixed(1)}%',
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              item['examName']?.toString() ??
+                                                  'Exam',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14),
+                                            ),
+                                            Text(
+                                              '${date.toLocal().toString().split('.').first} • ${item['correct']}/${item['total']} correct',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppTheme.secondaryText),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      Expanded(
-                                        child: _MiniStat(
-                                          label: 'Attempts',
-                                          value: '${summary.attempts}',
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 10, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: (passed
+                                                  ? AppTheme.success
+                                                  : AppTheme.danger)
+                                              .withValues(alpha: 0.1),
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${score.toStringAsFixed(0)}%',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                            color: passed
+                                                ? AppTheme.success
+                                                : AppTheme.danger,
+                                          ),
                                         ),
                                       ),
                                     ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    'Last taken: ${summary.lastTaken.day}/${summary.lastTaken.month}/${summary.lastTaken.year}',
-                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                                  ),
-                                ],
+                                  );
+                                },
                               ),
-                            ),
+                            ],
                           ),
-                        )
-                  ],
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Recent Exam Results',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (performances.isEmpty)
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          children: [
-                            const Icon(Icons.analytics_outlined, size: 64, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No exam results yet',
-                              style: TextStyle(color: Colors.grey.shade600),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Complete some exams to see your statistics here',
-                              style: TextStyle(
-                                color: Colors.grey.shade500,
-                                fontSize: 12,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
                         ),
                       ),
-                    )
-                  else
-                    ...performances.take(20).map(
-                          (perf) => Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: perf.percentage >= 70
-                                    ? Colors.green.shade100
-                                    : perf.percentage >= 50
-                                        ? Colors.orange.shade100
-                                        : Colors.red.shade100,
-                                child: Icon(
-                                  perf.percentage >= 70
-                                      ? Icons.check_circle
-                                      : perf.percentage >= 50
-                                          ? Icons.warning
-                                          : Icons.error,
-                                  color: perf.percentage >= 70
-                                      ? Colors.green
-                                      : perf.percentage >= 50
-                                          ? Colors.orange
-                                          : Colors.red,
-                                ),
-                              ),
-                              title: Text(
-                                perf.examName,
-                                style: const TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Text(
-                                '${perf.date.day}/${perf.date.month}/${perf.date.year} • ${(perf.durationSeconds / 60).toStringAsFixed(0)} min',
-                              ),
-                              trailing: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    '${perf.percentage.toStringAsFixed(1)}%',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      color: perf.percentage >= 70
-                                          ? Colors.green
-                                          : perf.percentage >= 50
-                                              ? Colors.orange
-                                              : Colors.red,
-                                    ),
+                      const SizedBox(height: 32),
+
+                      // 3. TOPIC BREAKDOWN & ACTIONABLE WEAK AREAS
+                      _sectionTitle('Topic Accuracy & Weak Areas'),
+                      if (topicStats.isEmpty)
+                        const Card(
+                          child: Padding(
+                            padding: EdgeInsets.all(20),
+                            child: Text('No topic breakdown available yet.'),
+                          ),
+                        )
+                      else
+                        Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              children: topicStats.entries.map((entry) {
+                                final topic = entry.key;
+                                final stat = entry.value;
+                                final acc = stat.accuracy;
+                                final isWeak =
+                                    stat.totalQuestions >= 2 && acc < 65.0;
+
+                                return Padding(
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 8),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 3,
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  topic,
+                                                  style: const TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 14),
+                                                ),
+                                                if (isWeak) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                        horizontal: 6,
+                                                        vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: AppTheme.danger
+                                                          .withValues(
+                                                              alpha: 0.1),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              4),
+                                                    ),
+                                                    child: const Text(
+                                                      'WEAK AREA',
+                                                      style: TextStyle(
+                                                          fontSize: 10,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          color:
+                                                              AppTheme.danger),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${stat.correctQuestions}/${stat.totalQuestions} questions correct (${acc.toStringAsFixed(0)}%)',
+                                              style: const TextStyle(
+                                                  fontSize: 12,
+                                                  color:
+                                                      AppTheme.secondaryText),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Expanded(
+                                        flex: 2,
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(4),
+                                          child: LinearProgressIndicator(
+                                            value: (acc / 100).clamp(0.0, 1.0),
+                                            minHeight: 8,
+                                            backgroundColor: isDark
+                                                ? AppTheme.darkBorder
+                                                : AppTheme.border,
+                                            valueColor: AlwaysStoppedAnimation(
+                                              acc >= 75
+                                                  ? AppTheme.success
+                                                  : (acc >= 60
+                                                      ? AppTheme.warning
+                                                      : AppTheme.danger),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 6),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        icon:
+                                            const Icon(Icons.school, size: 14),
+                                        label: const Text('Practice',
+                                            style: TextStyle(fontSize: 12)),
+                                        onPressed: () => _practiceTopic(topic),
+                                      ),
+                                    ],
                                   ),
-                                  Text(
-                                    '${perf.correct}/${perf.totalQuestions}',
-                                    style:
-                                        TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                  ),
-                                ],
-                              ),
+                                );
+                              }).toList(),
                             ),
                           ),
                         ),
-                ],
+                      const SizedBox(height: 32),
+
+                      // 4. DIFFICULTY BREAKDOWN
+                      _sectionTitle('Accuracy by Difficulty Level'),
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(20),
+                          child: Column(
+                            children: diffStats.entries.map((entry) {
+                              final level = entry.key;
+                              final stat = entry.value;
+                              final acc = stat.accuracy;
+
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 140,
+                                      child: Text(
+                                        'Level $level ${level == 1 ? "(Easy)" : level == 5 ? "(Hard)" : ""}',
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: (acc / 100).clamp(0.0, 1.0),
+                                          minHeight: 8,
+                                          backgroundColor: isDark
+                                              ? AppTheme.darkBorder
+                                              : AppTheme.border,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            acc >= 75
+                                                ? AppTheme.success
+                                                : (acc >= 60
+                                                    ? AppTheme.warning
+                                                    : AppTheme.danger),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 16),
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        stat.totalQuestions > 0
+                                            ? '${acc.toStringAsFixed(0)}% (${stat.correctQuestions}/${stat.totalQuestions})'
+                                            : 'No data',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                    ],
+                  ),
+                ),
               ),
             ),
     );
   }
-}
 
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatItem({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(icon, size: 32, color: color),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-        ),
-      ],
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12, left: 4),
+      child: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      ),
     );
   }
-}
 
-class _MiniStat extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _MiniStat({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-        const SizedBox(height: 2),
-        Text(
-          value,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isDark,
+  }) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const Spacer(),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppTheme.darkSecondaryText
+                    : AppTheme.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: isDark
+                    ? AppTheme.darkSecondaryText
+                    : AppTheme.secondaryText,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
-  }
-}
-
-class _TopicInsight {
-  final String topic;
-  final double accuracy;
-  final int attempts;
-
-  const _TopicInsight({
-    required this.topic,
-    required this.accuracy,
-    required this.attempts,
-  });
-}
-
-class _TopicCounter {
-  int total = 0;
-  int correct = 0;
-
-  void register(bool isCorrect) {
-    total += 1;
-    if (isCorrect) correct += 1;
-  }
-
-  double get accuracy => total == 0 ? 0 : correct / total;
-}
-
-class _ExamSummary {
-  final String examId;
-  final String examName;
-  final int attempts;
-  final double averageScore;
-  final double bestScore;
-  final DateTime lastTaken;
-
-  const _ExamSummary({
-    required this.examId,
-    required this.examName,
-    required this.attempts,
-    required this.averageScore,
-    required this.bestScore,
-    required this.lastTaken,
-  });
-}
-
-class _ExamAggregate {
-  final String examId;
-  final String examName;
-  int attempts = 0;
-  double totalScore = 0;
-  double bestScore = 0;
-  DateTime lastTaken = DateTime.fromMillisecondsSinceEpoch(0);
-
-  _ExamAggregate({required this.examId, required this.examName});
-
-  void record(ExamPerformance perf) {
-    attempts += 1;
-    totalScore += perf.percentage;
-    if (perf.percentage > bestScore) bestScore = perf.percentage;
-    if (perf.date.isAfter(lastTaken)) lastTaken = perf.date;
   }
 }

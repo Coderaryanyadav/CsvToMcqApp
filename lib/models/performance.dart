@@ -1,32 +1,46 @@
 class ExamPerformance {
-  String examId;
-  String examName;
-  DateTime date;
-  int totalQuestions;
-  int correct;
-  int incorrect;
-  int unanswered;
-  int durationSeconds;
-  Map<String, int> timePerQuestion;
-  Map<String, bool> questionResults;
-  List<String> weakTopics;
+  final String examId;
+  final String examName;
+  final DateTime date;
+  final int totalQuestions;
+  final int correct;
+  final int incorrect;
+  final int unanswered;
+  final int durationSeconds;
+  final Map<String, int> timePerQuestion;
+  final Map<String, bool> questionResults;
+  final List<String> weakTopics;
+  final int passingPercentage;
+  final Map<String, Map<String, int>> topicPerformance;
+  final Map<String, Map<String, int>> difficultyPerformance;
 
   ExamPerformance({
-    required this.examId,
-    required this.examName,
-    required this.date,
-    required this.totalQuestions,
+    this.examId = '',
+    this.examName = 'Exam',
+    DateTime? date,
+    int? totalQuestions,
+    int? total,
     required this.correct,
-    required this.incorrect,
-    required this.unanswered,
-    required this.durationSeconds,
+    int? incorrect,
+    this.unanswered = 0,
+    this.durationSeconds = 0,
+    double? score,
     this.timePerQuestion = const {},
     this.questionResults = const {},
     this.weakTopics = const [],
-  });
+    this.passingPercentage = 75,
+    this.topicPerformance = const {},
+    this.difficultyPerformance = const {},
+  })  : date = date ?? DateTime.now(),
+        totalQuestions = totalQuestions ??
+            (total ?? (correct + (incorrect ?? 0) + unanswered)),
+        incorrect = incorrect ??
+            ((totalQuestions ?? (total ?? correct)) - correct - unanswered);
 
   double get percentage =>
       totalQuestions > 0 ? (correct / totalQuestions * 100) : 0.0;
+
+  bool get passed => percentage >= passingPercentage;
 
   Map<String, dynamic> toJson() => {
         'examId': examId,
@@ -38,23 +52,66 @@ class ExamPerformance {
         'unanswered': unanswered,
         'durationSeconds': durationSeconds,
         'timePerQuestion': timePerQuestion,
-        'questionResults': questionResults.map((k, v) => MapEntry(k, v)),
+        'questionResults': questionResults,
         'weakTopics': weakTopics,
+        'passingPercentage': passingPercentage,
+        'topicPerformance': topicPerformance,
+        'difficultyPerformance': difficultyPerformance,
       };
 
-  factory ExamPerformance.fromJson(Map<String, dynamic> j) => ExamPerformance(
-        examId: j['examId'],
-        examName: j['examName'],
-        date: DateTime.parse(j['date']),
-        totalQuestions: j['totalQuestions'],
-        correct: j['correct'],
-        incorrect: j['incorrect'],
-        unanswered: j['unanswered'],
-        durationSeconds: j['durationSeconds'],
-        timePerQuestion: Map<String, int>.from(j['timePerQuestion'] ?? {}),
-        questionResults: (j['questionResults'] ?? {}).map(
-          (k, v) => MapEntry(k as String, v as bool),
-        ),
-        weakTopics: List<String>.from(j['weakTopics'] ?? []),
-      );
+  factory ExamPerformance.fromJson(Map<String, dynamic> j) {
+    final Map<String, Map<String, int>> topicPerf = {};
+    if (j['topicPerformance'] != null && j['topicPerformance'] is Map) {
+      (j['topicPerformance'] as Map).forEach((k, v) {
+        if (v is Map) {
+          topicPerf[k.toString()] = {
+            'correct': (v['correct'] as num?)?.toInt() ?? 0,
+            'total': (v['total'] as num?)?.toInt() ?? 0,
+          };
+        }
+      });
+    }
+
+    final Map<String, Map<String, int>> diffPerf = {};
+    if (j['difficultyPerformance'] != null &&
+        j['difficultyPerformance'] is Map) {
+      (j['difficultyPerformance'] as Map).forEach((k, v) {
+        if (v is Map) {
+          diffPerf[k.toString()] = {
+            'correct': (v['correct'] as num?)?.toInt() ?? 0,
+            'total': (v['total'] as num?)?.toInt() ?? 0,
+          };
+        }
+      });
+    }
+
+    return ExamPerformance(
+      examId: j['examId']?.toString() ?? '',
+      examName: j['examName']?.toString() ?? 'Exam',
+      date: j['date'] != null
+          ? (DateTime.tryParse(j['date'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      totalQuestions: (j['totalQuestions'] as num?)?.toInt() ?? 0,
+      correct: (j['correct'] as num?)?.toInt() ?? 0,
+      incorrect: (j['incorrect'] as num?)?.toInt() ?? 0,
+      unanswered: (j['unanswered'] as num?)?.toInt() ?? 0,
+      durationSeconds: (j['durationSeconds'] as num?)?.toInt() ?? 0,
+      timePerQuestion: Map<String, int>.from(
+        (j['timePerQuestion'] as Map?)?.map(
+              (k, v) => MapEntry(k.toString(), (v as num).toInt()),
+            ) ??
+            {},
+      ),
+      questionResults: (j['questionResults'] as Map?)?.map(
+            (k, v) => MapEntry(k.toString(), v == true),
+          ) ??
+          {},
+      weakTopics: List<String>.from(j['weakTopics'] ?? []),
+      passingPercentage: (j['passingPercentage'] as num?)?.toInt() ?? 75,
+      topicPerformance: topicPerf,
+      difficultyPerformance: diffPerf,
+    );
+  }
 }
+
+typedef Performance = ExamPerformance;

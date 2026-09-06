@@ -3,13 +3,21 @@ import 'screens/home_screen.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
-final ValueNotifier<bool> darkModeNotifier = ValueNotifier(false);
+final ValueNotifier<ThemeMode> themeModeNotifier =
+    ValueNotifier(ThemeMode.system);
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
   final settings = await StorageService.loadSettings();
-  darkModeNotifier.value = settings['darkMode'] ?? false;
+  final savedTheme = settings['themeMode']?.toString().toLowerCase();
+  if (savedTheme == 'dark' || settings['darkMode'] == true) {
+    themeModeNotifier.value = ThemeMode.dark;
+  } else if (savedTheme == 'light') {
+    themeModeNotifier.value = ThemeMode.light;
+  } else {
+    themeModeNotifier.value = ThemeMode.system;
+  }
   runApp(const MyApp());
 }
 
@@ -18,15 +26,15 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: darkModeNotifier,
-      builder: (context, isDark, child) {
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, themeMode, child) {
         return MaterialApp(
-          title: 'MCQ Exams',
+          title: 'QuizPro - MCQ Exam Simulator',
           debugShowCheckedModeBanner: false,
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
-          themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+          themeMode: themeMode,
           home: const HomeScreen(),
         );
       },

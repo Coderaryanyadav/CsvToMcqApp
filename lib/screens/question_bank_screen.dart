@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 import '../models/exam.dart';
 import '../models/question.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
+import '../theme/app_theme.dart';
 import 'import_preview_screen.dart';
 
 class QuestionBankScreen extends StatefulWidget {
@@ -21,7 +23,7 @@ class QuestionBankScreen extends StatefulWidget {
 
 class _QuestionBankScreenState extends State<QuestionBankScreen> {
   late List<Exam> _exams;
-  late Exam _selectedExam;
+  Exam? _selectedExam;
   final TextEditingController _searchCtrl = TextEditingController();
 
   String _selectedTopic = 'All Topics';
@@ -33,17 +35,15 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   void initState() {
     super.initState();
     _exams = List.from(widget.exams);
-    if (_exams.isEmpty) {
-      final defaultExam = Exam(id: 'exam_1', name: 'Sample Exam', questions: []);
-      _exams.add(defaultExam);
-    }
-    if (widget.initialExamId != null) {
-      _selectedExam = _exams.firstWhere(
-        (e) => e.id == widget.initialExamId,
-        orElse: () => _exams.first,
-      );
-    } else {
-      _selectedExam = _exams.first;
+    if (_exams.isNotEmpty) {
+      if (widget.initialExamId != null) {
+        _selectedExam = _exams.firstWhere(
+          (e) => e.id == widget.initialExamId,
+          orElse: () => _exams.first,
+        );
+      } else {
+        _selectedExam = _exams.first;
+      }
     }
   }
 
@@ -54,12 +54,15 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   }
 
   Future<void> _saveCurrentExam() async {
-    await StorageService.saveExam(_selectedExam);
-    setState(() {});
+    if (_selectedExam != null) {
+      await StorageService.saveExam(_selectedExam!);
+      setState(() {});
+    }
   }
 
   List<String> get _topics {
-    final t = _selectedExam.questions
+    if (_selectedExam == null) return ['All Topics'];
+    final t = _selectedExam!.questions
         .map((q) => q.topic)
         .where((x) => x != null && x.isNotEmpty)
         .cast<String>()
@@ -70,7 +73,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   }
 
   List<Question> get _filteredQuestions {
-    var list = List<Question>.from(_selectedExam.questions);
+    if (_selectedExam == null) return [];
+    var list = List<Question>.from(_selectedExam!.questions);
 
     // Search query
     final query = _searchCtrl.text.trim().toLowerCase();
@@ -118,6 +122,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   }
 
   Future<void> _importQuestionsToCurrentExam() async {
+    if (_selectedExam == null) return;
     try {
       final importResult = await ImportService.pickAndPreviewFile(
         targetExam: _selectedExam,
@@ -133,13 +138,14 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
       );
 
       if (validQuestions != null && validQuestions.isNotEmpty) {
-        _selectedExam.questions.addAll(validQuestions);
-        _selectedExam.reindexQuestions();
+        _selectedExam!.questions.addAll(validQuestions);
+        _selectedExam!.reindexQuestions();
         await _saveCurrentExam();
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Imported ${validQuestions.length} questions into ${_selectedExam.name}!'),
+            content: Text(
+                'Imported ${validQuestions.length} questions into ${_selectedExam!.name}!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -153,6 +159,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   }
 
   void _showAddEditQuestionDialog([Question? questionToEdit]) {
+    if (_selectedExam == null) return;
     final isEdit = questionToEdit != null;
     final qCtrl = TextEditingController(text: questionToEdit?.question ?? '');
     final optACtrl = TextEditingController(
@@ -197,8 +204,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
           builder: (context, setDlgState) {
             return AlertDialog(
               title: Text(isEdit
-                  ? 'Edit Question (${questionToEdit.id})'
-                  : 'Add New Question (Q${_selectedExam.nextQuestionNumber})'),
+                  ? 'Edit Question (${questionToEdit.displayId})'
+                  : 'Add New Question (Q${_selectedExam!.nextQuestionNumber})'),
               content: SizedBox(
                 width: 650,
                 child: SingleChildScrollView(
@@ -251,7 +258,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       const SizedBox(height: 16),
                       const Text(
                         'Options & Explanations (select correct answer):',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                       const SizedBox(height: 8),
 
@@ -460,18 +468,20 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       questionToEdit.questionType =
                           correctAnswers.length > 1 ? 'multiple' : questionType;
                       questionToEdit.optionExplanations = expMap;
-                      questionToEdit.topic =
-                          topicCtrl.text.trim().isEmpty ? null : topicCtrl.text.trim();
+                      questionToEdit.topic = topicCtrl.text.trim().isEmpty
+                          ? null
+                          : topicCtrl.text.trim();
                       questionToEdit.difficulty = difficulty;
                       questionToEdit.tags = tags;
                     } else {
                       final newQ = Question(
-                        id: 'Q${_selectedExam.nextQuestionNumber}',
+                        id: 'Q${_selectedExam!.nextQuestionNumber}',
                         question: qText,
                         options: [oA, oB, oC, oD],
                         correctAnswers: correctAnswers,
-                        questionType:
-                            correctAnswers.length > 1 ? 'multiple' : questionType,
+                        questionType: correctAnswers.length > 1
+                            ? 'multiple'
+                            : questionType,
                         optionExplanations: expMap,
                         topic: topicCtrl.text.trim().isEmpty
                             ? null
@@ -479,10 +489,10 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         difficulty: difficulty,
                         tags: tags,
                       );
-                      _selectedExam.questions.add(newQ);
+                      _selectedExam!.questions.add(newQ);
                     }
 
-                    _selectedExam.reindexQuestions();
+                    _selectedExam!.reindexQuestions();
                     _saveCurrentExam();
                     Navigator.pop(ctx);
                   },
@@ -527,7 +537,9 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
               else
                 IconButton(
                   icon: Icon(
-                    isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                    isSelected
+                        ? Icons.radio_button_checked
+                        : Icons.radio_button_unchecked,
                     color: isSelected ? Colors.green : Colors.grey,
                   ),
                   onPressed: () => onChanged(true),
@@ -591,7 +603,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
               Chip(
                 label: Text(
                   q.isMultiple ? 'MULTIPLE SELECT' : 'SINGLE SELECT',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.bold),
                 ),
                 backgroundColor:
                     q.isMultiple ? Colors.purple.shade50 : Colors.blue.shade50,
@@ -648,7 +661,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                               const SizedBox(width: 8),
                               Text(
                                 '${String.fromCharCode(65 + i)} — ',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold),
                               ),
                               Expanded(child: Text(q.options[i])),
                             ],
@@ -706,12 +720,31 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
     );
   }
 
+  void _duplicateQuestion(Question q) {
+    if (_selectedExam == null) return;
+    final dup = q.copyWith(
+      id: const Uuid().v4(),
+      question: '${q.question} (Copy)',
+      displayNumber: _selectedExam!.nextQuestionNumber,
+    );
+    _selectedExam!.questions.add(dup);
+    _selectedExam!.reindexQuestions();
+    _saveCurrentExam();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Duplicated question as ${dup.displayId}'),
+        backgroundColor: AppTheme.success,
+      ),
+    );
+  }
+
   void _deleteQuestion(Question q) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete ${q.id}?'),
-        content: Text('Are you sure you want to delete question ${q.id}: "${q.question}"?'),
+        title: Text('Delete ${q.displayId}?'),
+        content: Text(
+            'Are you sure you want to delete question ${q.displayId}: "${q.question}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -720,12 +753,15 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              _selectedExam.questions.removeWhere((item) => item.id == q.id);
-              _selectedExam.reindexQuestions();
-              _saveCurrentExam();
+              if (_selectedExam != null) {
+                _selectedExam!.questions.removeWhere((item) => item.id == q.id);
+                _selectedExam!.reindexQuestions();
+                _saveCurrentExam();
+              }
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Deleted ${q.id} and re-indexed.')),
+                SnackBar(
+                    content: Text('Deleted ${q.displayId} and re-indexed.')),
               );
             },
             child: const Text('Delete'),
@@ -738,6 +774,48 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
+    if (_selectedExam == null || _exams.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Question Bank'),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppTheme.accentBlue.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.storage_outlined,
+                      size: 48, color: AppTheme.accentBlue),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'No Question Banks Available',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.text),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Create an exam track or import a CSV/JSON file to manage your questions here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppTheme.secondaryText, fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final questions = _filteredQuestions;
 
     return Scaffold(
@@ -777,7 +855,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                 ),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
-                  value: _selectedExam.id,
+                  value: _selectedExam!.id,
                   underline: const SizedBox(),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -807,7 +885,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    '${_selectedExam.questions.length} Questions',
+                    '${_selectedExam!.questions.length} Questions',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.onPrimaryContainer,
@@ -857,7 +935,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         items: _topics
                             .map((t) => DropdownMenuItem(
                                   value: t,
-                                  child: Text(t, style: const TextStyle(fontSize: 13)),
+                                  child: Text(t,
+                                      style: const TextStyle(fontSize: 13)),
                                 ))
                             .toList(),
                         onChanged: (v) {
@@ -879,7 +958,9 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 ))
                             .toList(),
                         onChanged: (v) {
-                          if (v != null) setState(() => _selectedDifficulty = v);
+                          if (v != null) {
+                            setState(() => _selectedDifficulty = v);
+                          }
                         },
                       ),
                       const SizedBox(width: 16),
@@ -938,8 +1019,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                             size: 64, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
                         Text(
-                          _selectedExam.questions.isEmpty
-                              ? 'No questions in ${_selectedExam.name} yet.'
+                          _selectedExam!.questions.isEmpty
+                              ? 'No questions in ${_selectedExam!.name} yet.'
                               : 'No questions match the current filters.',
                           style: TextStyle(
                             fontSize: 16,
@@ -967,8 +1048,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                     ),
                   )
                 : ListView.separated(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: questions.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
@@ -997,8 +1078,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                   q.id,
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color:
-                                        theme.colorScheme.onPrimaryContainer,
+                                    color: theme.colorScheme.onPrimaryContainer,
                                   ),
                                 ),
                               ),
@@ -1006,8 +1086,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                               // Question Content & Meta
                               Expanded(
                                 child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
                                       q.question,
@@ -1054,8 +1133,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                         if (q.topic != null &&
                                             q.topic!.isNotEmpty)
                                           Container(
-                                            padding: const EdgeInsets
-                                                .symmetric(
+                                            padding: const EdgeInsets.symmetric(
                                                 horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
                                               color: Colors.grey.shade100,
@@ -1095,6 +1173,12 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.copy_outlined,
+                                        size: 19),
+                                    tooltip: 'Duplicate Question',
+                                    onPressed: () => _duplicateQuestion(q),
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.visibility_outlined,
                                         size: 20),

@@ -63,7 +63,7 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
           Navigator.pop(context);
           return;
         }
-        
+
         if (!mounted) return;
         final previewedExam = await Navigator.push<Exam>(
           context,
@@ -71,13 +71,13 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
             builder: (_) => ImportPreviewScreen(importResult: importResult),
           ),
         );
-        
+
         if (previewedExam == null) {
           if (!mounted) return;
           Navigator.pop(context);
           return;
         }
-        
+
         exam = Exam(
           id: const Uuid().v4(),
           name: 'Imported Exam',
@@ -112,8 +112,12 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
     }
     if (widget.examId != null) {
       try {
-        final j = await StorageService.readExamFile('${widget.examId}.json');
-        exam = Exam.fromJson(j);
+        final loadedExam = await StorageService.getExam(widget.examId!);
+        if (loadedExam != null) {
+          exam = loadedExam;
+        } else {
+          throw Exception('Exam not found');
+        }
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(
@@ -134,7 +138,7 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
 
   Future<void> _save() async {
     try {
-      await StorageService.saveExamFile('${exam.id}.json', exam.toJson());
+      await StorageService.saveExam(exam);
       if (!mounted) return;
       setState(() {});
     } catch (e) {
@@ -324,9 +328,8 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
               );
               if (ok == true) {
                 setState(() {
-                  exam.name = ctrl.text.trim().isEmpty
-                      ? exam.name
-                      : ctrl.text.trim();
+                  exam.name =
+                      ctrl.text.trim().isEmpty ? exam.name : ctrl.text.trim();
                 });
                 await _save();
               }

@@ -9,7 +9,8 @@ class ImportPreviewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final res = importResult;
-    final hasCritical = res.criticalErrors.isNotEmpty || res.validQuestions.isEmpty;
+    final hasCritical =
+        res.criticalErrors.isNotEmpty || res.validQuestions.isEmpty;
     final theme = Theme.of(context);
 
     final idRange = res.validQuestions.isNotEmpty
@@ -208,10 +209,13 @@ class ImportPreviewScreen extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: isWarn ? Colors.orange.shade50 : Colors.red.shade50,
+                      color:
+                          isWarn ? Colors.orange.shade50 : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: isWarn ? Colors.orange.shade200 : Colors.red.shade200,
+                        color: isWarn
+                            ? Colors.orange.shade200
+                            : Colors.red.shade200,
                       ),
                     ),
                     child: Column(
@@ -268,7 +272,8 @@ class ImportPreviewScreen extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 16),
-            ] else if (res.criticalErrors.isNotEmpty || res.warnings.isNotEmpty) ...[
+            ] else if (res.criticalErrors.isNotEmpty ||
+                res.warnings.isNotEmpty) ...[
               if (res.criticalErrors.isNotEmpty) ...[
                 Text(
                   'Critical Errors',
@@ -280,7 +285,9 @@ class ImportPreviewScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 ...res.criticalErrors.map((e) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Text('• $e', style: TextStyle(color: Colors.red.shade900, fontSize: 13)),
+                      child: Text('• $e',
+                          style: TextStyle(
+                              color: Colors.red.shade900, fontSize: 13)),
                     )),
                 const SizedBox(height: 12),
               ],
@@ -295,7 +302,9 @@ class ImportPreviewScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 ...res.warnings.map((e) => Padding(
                       padding: const EdgeInsets.only(bottom: 6),
-                      child: Text('• $e', style: TextStyle(color: Colors.orange.shade900, fontSize: 13)),
+                      child: Text('• $e',
+                          style: TextStyle(
+                              color: Colors.orange.shade900, fontSize: 13)),
                     )),
                 const SizedBox(height: 12),
               ],
@@ -431,4 +440,3 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
