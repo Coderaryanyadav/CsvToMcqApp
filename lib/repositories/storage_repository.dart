@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
@@ -63,12 +64,14 @@ class IoStorageRepository implements IStorageRepository {
     final List<Exam> exams = [];
     final files = mcqDir
         .listSync()
-        .where((f) =>
-            f.path.endsWith('.json') &&
-            !f.path.contains('performance_') &&
-            !f.path.contains('session_') &&
-            !f.path.endsWith('settings.json') &&
-            !f.path.endsWith('students.json'))
+        .where((f) {
+          final filename = p.basename(f.path);
+          return filename.endsWith('.json') &&
+              !filename.startsWith('performance_') &&
+              !filename.startsWith('session_') &&
+              filename != 'settings.json' &&
+              filename != 'students.json';
+        })
         .toList();
 
     for (final f in files) {
@@ -121,7 +124,7 @@ class IoStorageRepository implements IStorageRepository {
     }
 
     final file = File('${mcqDir.path}/${exam.id}.json');
-    await file.writeAsString(jsonEncode(exam.toJson()));
+    await file.writeAsString(jsonEncode(exam.toJson()), flush: true);
   }
 
   @override
@@ -145,8 +148,10 @@ class IoStorageRepository implements IStorageRepository {
 
     final files = mcqDir
         .listSync()
-        .where(
-            (f) => f.path.contains('performance_') && f.path.endsWith('.json'))
+        .where((f) {
+          final name = p.basename(f.path);
+          return name.startsWith('performance_') && name.endsWith('.json');
+        })
         .toList();
 
     final List<ExamPerformance> list = [];
@@ -170,10 +175,11 @@ class IoStorageRepository implements IStorageRepository {
       _cachedPerformances!.sort((a, b) => b.date.compareTo(a.date));
     }
 
+    final studentTag = performance.studentId != null ? '_${performance.studentId}' : '';
     final file = File(
-      '${mcqDir.path}/performance_${performance.examId}_${DateTime.now().millisecondsSinceEpoch}.json',
+      '${mcqDir.path}/performance_${performance.examId}_${DateTime.now().microsecondsSinceEpoch}$studentTag.json',
     );
-    await file.writeAsString(jsonEncode(performance.toJson()));
+    await file.writeAsString(jsonEncode(performance.toJson()), flush: true);
   }
 
   @override
@@ -193,7 +199,7 @@ class IoStorageRepository implements IStorageRepository {
   Future<void> saveSession(String examId, Map<String, dynamic> session) async {
     await init();
     final file = File('${mcqDir.path}/session_$examId.json');
-    await file.writeAsString(jsonEncode(session));
+    await file.writeAsString(jsonEncode(session), flush: true);
   }
 
   @override
@@ -239,7 +245,7 @@ class IoStorageRepository implements IStorageRepository {
     await init();
     _cachedSettings = Map<String, dynamic>.from(settings);
     final file = File('${mcqDir.path}/settings.json');
-    await file.writeAsString(jsonEncode(settings));
+    await file.writeAsString(jsonEncode(settings), flush: true);
   }
 
   @override
@@ -312,6 +318,7 @@ class IoStorageRepository implements IStorageRepository {
     final file = File('${mcqDir.path}/students.json');
     await file.writeAsString(
       jsonEncode(students.map((s) => s.toJson()).toList()),
+      flush: true,
     );
   }
 
@@ -324,6 +331,7 @@ class IoStorageRepository implements IStorageRepository {
     final file = File('${mcqDir.path}/students.json');
     await file.writeAsString(
       jsonEncode(students.map((s) => s.toJson()).toList()),
+      flush: true,
     );
 
     final activeId = await getActiveStudentId();
