@@ -219,6 +219,51 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
     }
   }
 
+  Future<void> _clearAllQuestionsInExam() async {
+    if (_selectedExam == null || _selectedExam!.questions.isEmpty) return;
+    final count = _selectedExam!.questions.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.cleaning_services_outlined,
+                color: AppTheme.warning, size: 24),
+            SizedBox(width: 8),
+            Text('Clear All Questions'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to remove all $count questions from "${_selectedExam!.name}"?\n\nThe exam track will remain in your library as an empty track.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.warning),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      _selectedExam!.questions.clear();
+      await _saveCurrentExam();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cleared all questions from ${_selectedExam!.name}.'),
+          backgroundColor: AppTheme.warning,
+        ),
+      );
+    }
+  }
+
   void _showAddEditQuestionDialog([Question? questionToEdit]) {
     if (_selectedExam == null) return;
     final isEdit = questionToEdit != null;
@@ -967,6 +1012,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                   onSelected: (val) {
                     if (val == 'delete') {
                       _deleteCurrentExam();
+                    } else if (val == 'clear_questions') {
+                      _clearAllQuestionsInExam();
                     } else if (val == 'export') {
                       if (_selectedExam != null) {
                         final messenger = ScaffoldMessenger.of(context);
@@ -995,15 +1042,26 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         ],
                       ),
                     ),
+                    const PopupMenuItem(
+                      value: 'clear_questions',
+                      child: Row(
+                        children: [
+                          Icon(Icons.cleaning_services_outlined,
+                              size: 18, color: AppTheme.warning),
+                          SizedBox(width: 8),
+                          Text('Clear Questions'),
+                        ],
+                      ),
+                    ),
                     const PopupMenuDivider(),
                     const PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete_outline,
+                          Icon(Icons.delete_forever,
                               size: 18, color: AppTheme.danger),
                           SizedBox(width: 8),
-                          Text('Delete Exam',
+                          Text('Delete / Remove Exam',
                               style: TextStyle(color: AppTheme.danger)),
                         ],
                       ),

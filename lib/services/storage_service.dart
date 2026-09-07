@@ -91,6 +91,10 @@ class StorageService {
     await _repo.savePerformance(performance);
   }
 
+  static Future<void> deletePerformancesByExamId(String examId) async {
+    await _repo.deletePerformancesByExamId(examId);
+  }
+
   static Future<List<ExamPerformance>> loadAllPerformancesAsync() async {
     return _repo.getAllPerformances();
   }

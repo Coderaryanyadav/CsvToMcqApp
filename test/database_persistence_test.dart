@@ -287,5 +287,47 @@ void main() {
       expect(s2Perfs.first.studentId, equals('s2'));
       expect(s2Perfs.first.correct, equals(5));
     });
+
+    test('Completely deleting an exam purges exam, active session, and performance history', () async {
+      final repo1 = TestStorageRepository(tempTestDir);
+      StorageService.setRepository(repo1);
+      await StorageService.init();
+
+      final student = StudentProfile(id: 'std-1', name: 'Student 1');
+      await StorageService.saveStudent(student);
+      await StorageService.setActiveStudent(student);
+
+      final exam = Exam(id: 'exam-to-purge', name: 'Exam to Purge', questions: [
+        Question(id: 'q1', question: 'Q1', options: ['A', 'B', 'C', 'D'], correct: 0),
+      ]);
+      await StorageService.saveExam(exam);
+
+      await StorageService.saveSession('exam-to-purge', {'currentIndex': 0});
+      await StorageService.savePerformance(ExamPerformance(
+        examId: 'exam-to-purge',
+        examName: 'Exam to Purge',
+        studentId: 'std-1',
+        studentName: 'Student 1',
+        correct: 1,
+        totalQuestions: 1,
+      ));
+
+      expect((await StorageService.loadAllExams()).any((e) => e.id == 'exam-to-purge'), isTrue);
+      expect(await StorageService.readSession('exam-to-purge'), isNotNull);
+      expect((await StorageService.loadAllPerformancesAsync()).any((p) => p.examId == 'exam-to-purge'), isTrue);
+
+      // Perform complete deletion & purge
+      await StorageService.deleteExam('exam-to-purge');
+      await StorageService.deletePerformancesByExamId('exam-to-purge');
+
+      // Verify cold restart after complete purge
+      final repo2 = TestStorageRepository(tempTestDir);
+      StorageService.setRepository(repo2);
+      await StorageService.init();
+
+      expect((await StorageService.loadAllExams()).any((e) => e.id == 'exam-to-purge'), isFalse);
+      expect(await StorageService.readSession('exam-to-purge'), isNull);
+      expect((await StorageService.loadAllPerformancesAsync()).any((p) => p.examId == 'exam-to-purge'), isFalse);
+    });
   });
 }

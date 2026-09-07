@@ -14,6 +14,7 @@ abstract class IStorageRepository {
   Future<void> deleteExam(String id);
   Future<List<ExamPerformance>> getAllPerformances();
   Future<void> savePerformance(ExamPerformance performance);
+  Future<void> deletePerformancesByExamId(String examId);
   Future<Map<String, dynamic>?> getSession(String examId);
   Future<void> saveSession(String examId, Map<String, dynamic> session);
   Future<void> deleteSession(String examId);
@@ -180,6 +181,28 @@ class IoStorageRepository implements IStorageRepository {
       '${mcqDir.path}/performance_${performance.examId}_${DateTime.now().microsecondsSinceEpoch}$studentTag.json',
     );
     await file.writeAsString(jsonEncode(performance.toJson()), flush: true);
+  }
+
+  @override
+  Future<void> deletePerformancesByExamId(String examId) async {
+    await init();
+    _cachedPerformances?.removeWhere((p) => p.examId == examId);
+
+    final files = mcqDir
+        .listSync()
+        .where((f) {
+          final name = p.basename(f.path);
+          return name.startsWith('performance_${examId}_') && name.endsWith('.json');
+        })
+        .toList();
+
+    for (final f in files) {
+      try {
+        if (await f.exists()) {
+          await f.delete();
+        }
+      } catch (_) {}
+    }
   }
 
   @override

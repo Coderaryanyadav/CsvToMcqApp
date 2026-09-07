@@ -125,41 +125,79 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _deleteExamDialog(Exam exam) async {
+    bool purgeHistory = true;
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.delete_outline, color: AppTheme.danger, size: 24),
-            SizedBox(width: 8),
-            Text('Delete Exam'),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to delete "${exam.name}" and all of its ${exam.questions.length} questions?\n\nThis action cannot be undone.',
-          style: const TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete Exam'),
-          ),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.delete_forever, color: AppTheme.danger, size: 26),
+                SizedBox(width: 8),
+                Text('Remove / Delete Exam'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Are you sure you want to completely remove "${exam.name}" and all ${exam.questions.length} questions from the app?',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                const SizedBox(height: 16),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text(
+                    'Also remove past exam attempt history',
+                    style: TextStyle(fontSize: 13, color: AppTheme.text),
+                  ),
+                  value: purgeHistory,
+                  onChanged: (val) {
+                    setModalState(() {
+                      purgeHistory = val ?? true;
+                    });
+                  },
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '⚠️ This action cannot be undone.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.danger,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text('Delete Exam'),
+              ),
+            ],
+          );
+        },
       ),
     );
 
     if (confirmed == true) {
       await StorageService.deleteExam(exam.id);
+      if (purgeHistory) {
+        await StorageService.deletePerformancesByExamId(exam.id);
+      }
       await _loadData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exam "${exam.name}" deleted successfully.'),
+          content: Text('Exam "${exam.name}" completely removed.'),
           backgroundColor: AppTheme.danger,
         ),
       );
@@ -1323,6 +1361,14 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ).then((_) => _loadData());
                         },
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.delete_outline,
+                            size: 14, color: AppTheme.danger),
+                        label: const Text('Remove',
+                            style: TextStyle(
+                                fontSize: 12, color: AppTheme.danger)),
+                        onPressed: () => _deleteExamDialog(exam),
                       ),
                     ],
                   ),
