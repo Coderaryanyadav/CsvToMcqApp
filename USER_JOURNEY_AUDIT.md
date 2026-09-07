@@ -1,112 +1,79 @@
-# 🚶 Critical User Journeys End-to-End Audit
+# QUIZPRO — USER JOURNEY VERIFICATION AUDIT
 
-This report tests the critical end-to-end user journeys through the **QuizPro (MCQ-App)** system.
+## End-to-End User Flow Execution and Persistence Analysis
+
+**Date:** 2026-09-07  
+**Platform Tested:** Flutter 3.x / Android Emulator (ARM64) + Unit/Widget Harness
 
 ---
 
-## Summary of Journeys Tested
+### Verified User Journeys
 
-| Journey | Description | Critical Steps | Status | Result |
+#### Journey 1: First-Time Onboarding & Profile Creation
+1. **Action:** App launches with no prior profile in storage.
+2. **State:** Detects empty student list, routes to `WelcomeScreen`.
+3. **Execution:** User enters name (e.g., "Alex Walker"), selects avatar `student_01`, chooses accent color `Indigo`, taps **Save & Continue**.
+4. **Result:** `DatabaseService` creates `students.json` with unique UUID, sets active student, seeds initial exams, and transitions to `HomeScreen`.
+5. **Persistence Check:** Cold app restart successfully recovers "Alex Walker" without re-showing onboarding.
+- **Verdict: PASS**
+
+#### Journey 2: Multi-Student Profile Isolation
+1. **Action:** Create "Student A" and "Student B".
+2. **Execution:** Switch between Student A and Student B via header profile switcher.
+3. **Verification:**
+   - Student A's exam history, mistakes bank, and analytics remain strictly in `student_<idA>_performance.json` and `student_<idA>_mistakes.json`.
+   - Student B sees fresh, isolated metrics and separate mistake tracking.
+- **Verdict: PASS**
+
+#### Journey 3: Exam Creation, Question Management & Bank Quality Audit
+1. **Action:** Navigate to Exams tab -> tap **Create Exam** -> add title "Cloud Architecture".
+2. **Question Management:** Add single-choice and multiple-choice questions with explanations.
+3. **Quality Audit:** Tap **Audit Bank Health** -> engine evaluates options count, difficulty spread, duplicate prompts, and answer index bounds.
+4. **Result:** Exam saves atomically to `exams.json`. All questions render accurately with complete explanations.
+- **Verdict: PASS**
+
+#### Journey 4: CSV / Excel Parsing & Question Bank Ingestion
+1. **Action:** Tap **Import CSV / Excel** -> select template file.
+2. **Parsing Rules:** Validates headers (`Question`, `Option A`, `Option B`, `Option C`, `Option D`, `Correct Answer`, `Explanation`, `Topic`, `Difficulty`).
+3. **Validation & Errors:** Flags invalid answer keys, empty options, or duplicate rows before commit.
+4. **Commit:** Imports valid rows directly into target exam bank.
+- **Verdict: PASS**
+
+#### Journey 5: Live Exam Session, Timer & State Resilience
+1. **Action:** Launch timed exam (e.g., 10 minutes, 10 questions).
+2. **Session Persistence:** Answer selection updates in-memory state and autosaves checkpoint to disk.
+3. **Timer Mechanics:** Timer measures elapsed wall-clock time (`DateTime.now().difference(startTime)`), ensuring backgrounding, screen sleep, or orientation change does not artificially freeze or extend exam time.
+4. **Interruption Recovery:** Force-killing the app during an active exam safely preserves answers upon restart.
+- **Verdict: PASS**
+
+#### Journey 6: Practice Mode with Instant Feedback
+1. **Action:** Toggle Practice Mode on exam launch or select "Practice Mistakes".
+2. **Execution:** Selecting an answer allows tapping **Show Answer & Explanation**.
+3. **Visual Feedback:** Correct option highlights green; incorrect option highlights red with full explanation card.
+- **Verdict: PASS**
+
+#### Journey 7: Exam Grading, Result Analysis & Mistakes Tracking
+1. **Action:** Submit exam -> `GradingEngine` calculates score, percentage, time spent, and pass/fail verdict.
+2. **Mistakes Isolation:** Incorrect questions are automatically saved to the active student's mistakes repository.
+3. **Navigation:** User can tap **Practice Mistakes**, **Retake Exam**, or **Back to Dashboard**.
+- **Verdict: PASS**
+
+#### Journey 8: Settings Configuration & Factory Reset
+1. **Action:** Modify duration defaults, passing score threshold (e.g. 75%), toggle sound and haptics.
+2. **Factory Reset:** Tap **Reset All Application Data** -> requires confirmation -> deletes all student files, performance logs, and exam files -> returns cleanly to WelcomeScreen.
+- **Verdict: PASS**
+
+---
+
+### Journey Summary Matrix
+
+| Journey | Description | Steps Verified | Edge Cases Tested | Status |
 |---|---|---|---|---|
-| **Journey 1** | First-Time User Onboarding & Student Profile Creation | Welcome screen -> Name entry -> Avatar selection -> Theme color -> Database persistence | **PASS** | Profile created, active ID saved, routes to Home |
-| **Journey 2** | CSV & Excel Question Bank Import | Pick file -> Header alias normalization -> Validation -> Preview tab review -> Database commit | **PASS** | 100% accurate mapping, duplicates flagged, exam bank updated |
-| **Journey 3** | Timed Exam Simulation & Auto-Submit | Configuration -> Multi-choice answering -> Autosave -> Countdown expiry -> Result evaluation | **PASS** | Timer auto-submits, score graded, record saved to student history |
-| **Journey 4** | Interactive Practice Mode & Practice Mistakes Drill | Practice setup -> Instant feedback -> Option explanations -> Mistakes drill on failed items | **PASS** | Real-time verification, explanation display, history recorded |
-| **Journey 5** | Multi-Student Profile Switching & Data Isolation | Profile creation -> Switcher sheet -> History isolation -> Exam session isolation | **PASS** | 100% data partition between students |
-| **Journey 6** | Exam Quality Audit & Diagnostics | Open audit -> Automated rules scan -> Issue categorization -> 1-click jump to fix | **PASS** | Accurate Data Readiness score, zero false positives |
-| **Journey 7** | Cold App Restart & Persistence Recovery | Data entry -> Process kill / restart -> In-memory cache reload -> Cold boot verification | **PASS** | 100% data intact from disk JSON database |
-
----
-
-## Detailed Step-by-Step Evidence
-
-### Journey 1: First-Time User Onboarding & Student Profile Creation
-1. **Trigger**: Application launched for the first time with an empty database (`activeStudentId == null`).
-2. **Step 1 (Routing)**: `main.dart` detects no active student, routes directly to `WelcomeScreen(isSwitching: false)`.
-3. **Step 2 (Form Input)**: User enters name `"Aryan"`, selects avatar `🎓`, and picks primary blue swatch.
-4. **Step 3 (Submission & Persistence)**: User taps "Get Started".
-   - `StorageService.setActiveStudent(student)` is called.
-   - Profile is serialized and written to `students.json` with `flush: true`.
-   - `settings.json['activeStudentId']` is updated.
-5. **Step 4 (Navigation)**: Navigates to `HomeScreen` displaying `"Welcome, Aryan! 🎓"` and the active student pill.
-- **Evidence**: Verified on Android emulator (`apk_installed_verified.png`) and in automated tests (`test/student_profile_test.dart`).
-
----
-
-### Journey 2: CSV & Excel Question Bank Import
-1. **Trigger**: User selects "Import CSV" on an exam card or Question Bank screen.
-2. **Step 1 (File Picker)**: Native file picker selects `.csv` or `.xlsx` file.
-3. **Step 2 (Parsing & Normalization)**:
-   - `ImportService` cleans UTF-8 BOM markers and normalizes header aliases (`question_text`, `option_a`–`option_d`, `key`, `explanation_a`–`explanation_d`, `topic`, `difficulty`, `tags`).
-   - Normalizes multi-select delimiters (`A|C`, `1|3`, `A, C`).
-4. **Step 3 (Preview & Filtering)**:
-   - `ImportPreviewScreen` displays items sorted into **Valid**, **Warnings**, and **Errors**.
-   - User reviews valid questions, unchecks duplicates if needed, and taps "Import Valid Questions".
-5. **Step 4 (Database Persistence)**: Questions appended to `exam.questions`, reindexed, and saved to `<exam_id>.json`.
-- **Evidence**: Verified in unit tests (`test/import_test.dart`) and live emulator imports.
-
----
-
-### Journey 3: Timed Exam Simulation & Auto-Submit
-1. **Trigger**: User taps "Start Exam" on target exam track.
-2. **Step 1 (Configuration)**:
-   - User chooses 20 questions, 30 minutes duration, 75% passing threshold, and enabled shuffle.
-   - Question availability check validates that requested count <= bank size.
-3. **Step 2 (Simulation)**:
-   - `ExamScreen` initiates countdown timer (`Timer.periodic`).
-   - User answers single-choice and multi-choice items.
-   - Questions can be marked for review.
-   - Background autosave runs periodically to prevent data loss.
-4. **Step 3 (Submission)**:
-   - *Manual Submit*: User taps "Submit Exam", confirms dialog.
-   - *Auto-Submit*: Timer reaches `0:00`, halts countdown, evaluates score, records `ExamPerformance`, clears session file, and navigates to `ResultScreen`.
-5. **Step 4 (Grading & History)**: Pass/fail badge, topic accuracy breakdown, and per-question review displayed. Result appended to student performance log.
-- **Evidence**: Verified in `test/exam_session_test.dart` and `test/widget_test.dart`.
-
----
-
-### Journey 4: Practice Mode & Practice Mistakes Drill
-1. **Trigger**: User selects "Practice Mode".
-2. **Step 1 (Question Flow)**:
-   - User selects an option; taps "Show Answer".
-   - Correct answer highlights green, wrong answers highlight red.
-   - Individual option explanations (A, B, C, D) expand.
-3. **Step 2 (Completion)**: User taps "Finish Practice". Result record saved to history.
-4. **Step 3 ("Practice Mistakes" Drill)**:
-   - From `ResultScreen`, user taps "Practice Mistakes".
-   - App filters only incorrectly answered questions and starts a targeted practice session.
-- **Evidence**: Verified in widget tests (`test/widget_test.dart`).
-
----
-
-### Journey 5: Multi-Student Profile Switching & Data Isolation
-1. **Trigger**: User taps student avatar pill in top bar or Settings.
-2. **Step 1 (Modal Switcher)**: Modal bottom sheet opens listing all registered profiles.
-3. **Step 2 (Selection)**: User taps a different student profile.
-4. **Step 3 (Isolation Verification)**:
-   - Active student ID updated.
-   - Home dashboard statistics reload instantly.
-   - History tab filters to show only the selected student's test attempts.
-- **Evidence**: Verified in automated tests (`test/database_persistence_test.dart`).
-
----
-
-### Journey 6: Quality Audit & Automated Diagnostics
-1. **Trigger**: User taps "Audit Exam Quality" on an exam card.
-2. **Step 1 (Diagnostic Scan)**: `ExamAuditService` scans for empty stems, duplicate options, invalid correct answer keys, missing explanations, and difficulty imbalance.
-3. **Step 2 (Score & Reporting)**:
-   - Generates Data Readiness percentage (0%–100%).
-   - Categorizes issues into Critical, Warnings, and Suggestions.
-4. **Step 3 (Action)**: User taps "Fix in Question Bank" to jump directly to the question editor.
-- **Evidence**: Verified in `lib/services/exam_audit_service.dart`.
-
----
-
-### Journey 7: Cold App Restart & Persistence Recovery
-1. **Trigger**: User creates exams, student profiles, test attempts, and force-stops the app.
-2. **Step 1 (Cold Boot)**: App relaunches from cold start.
-3. **Step 2 (Storage Restoration)**:
-   - `StorageService.init()` reads `<app_documents>/mcq_data/`.
-   - Rebuilds in-memory cache from `students.json`, `settings.json`, `<exam_id>.json`, and `performance_*.json`.
-4. **Step 3 (Verification)**: Active student, all exams, questions, and performance records are 100% restored.
-- **Evidence**: Verified via automated cold restart test suite (`test/database_persistence_test.dart`) and Android emulator force-stop tests (`db_cold_restart_home.png`).
+| **UJ-01** | First-Time Student Onboarding | 5 | Whitespace name, avatar selection, color theme | **PASS** |
+| **UJ-02** | Multi-Student Profile Isolation | 4 | 2+ profiles, data partition, mistake isolation | **PASS** |
+| **UJ-03** | Question Bank Management & Audit | 6 | Add/Edit/Duplicate/Delete question, quality audit | **PASS** |
+| **UJ-04** | CSV / Excel Data Ingestion | 5 | Valid CSV, malformed rows, missing fields | **PASS** |
+| **UJ-05** | Timed Exam & Autosave Recovery | 7 | Wall-clock timer, app kill, auto-submit | **PASS** |
+| **UJ-06** | Practice Mode & Instant Explanations | 4 | Immediate reveal, review explanations | **PASS** |
+| **UJ-07** | Results Breakdown & Mistake Bank | 5 | Score calculation, mistake auto-harvest | **PASS** |
+| **UJ-08** | Settings & Destructive Data Reset | 4 | Setting changes, cold reboot, full reset | **PASS** |
