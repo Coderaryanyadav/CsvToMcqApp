@@ -124,6 +124,109 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _deleteExamDialog(Exam exam) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppTheme.danger, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Exam'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${exam.name}" and all of its ${exam.questions.length} questions?\n\nThis action cannot be undone.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Exam'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await StorageService.deleteExam(exam.id);
+      await _loadData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Exam "${exam.name}" deleted successfully.'),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+    }
+  }
+
+  Future<void> _renameExamDialog(Exam exam) async {
+    final nameCtrl = TextEditingController(text: exam.name);
+    final pctCtrl =
+        TextEditingController(text: exam.passingPercentage.toString());
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit Exam Details'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Exam Title',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: pctCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Passing Score (%)',
+                hintText: 'e.g. 70',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Save Changes'),
+          ),
+        ],
+      ),
+    );
+
+    if (saved == true) {
+      final newName = nameCtrl.text.trim();
+      final newPct =
+          int.tryParse(pctCtrl.text.trim()) ?? exam.passingPercentage;
+      if (newName.isNotEmpty) {
+        exam.name = newName;
+        exam.passingPercentage = newPct.clamp(1, 100);
+        await StorageService.saveExam(exam);
+        await _loadData();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Exam "$newName" updated successfully!'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> _startImportFlow([Exam? preselected]) async {
     Exam? target = preselected ?? (exams.isNotEmpty ? exams.first : null);
     if (exams.isEmpty) {
@@ -1044,6 +1147,68 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: AppTheme.primaryNavy,
                   ),
                 ),
+              ),
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert,
+                    size: 20, color: AppTheme.secondaryText),
+                tooltip: 'Exam Options',
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    _renameExamDialog(exam);
+                  } else if (value == 'delete') {
+                    _deleteExamDialog(exam);
+                  } else if (value == 'export') {
+                    ImportService.exportToCsvFile(exam).then((path) {
+                      if (path != null && mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Exported to $path'),
+                            backgroundColor: AppTheme.success,
+                          ),
+                        );
+                      }
+                    });
+                  }
+                },
+                itemBuilder: (ctx) => [
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit_outlined,
+                            size: 18, color: AppTheme.text),
+                        SizedBox(width: 8),
+                        Text('Rename / Edit'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'export',
+                    child: Row(
+                      children: [
+                        Icon(Icons.file_download_outlined,
+                            size: 18, color: AppTheme.text),
+                        SizedBox(width: 8),
+                        Text('Export CSV'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline,
+                            size: 18, color: AppTheme.danger),
+                        SizedBox(width: 8),
+                        Text('Delete Exam',
+                            style: TextStyle(color: AppTheme.danger)),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

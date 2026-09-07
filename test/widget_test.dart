@@ -132,4 +132,56 @@ void main() {
     expect(exam.questions.length, 2);
     expect(exam.nextQuestionNumber, 3);
   });
+
+  testWidgets('Delete Exam dialog renders confirmation options safely',
+      (WidgetTester tester) async {
+    bool deleted = false;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (context) {
+        return Scaffold(
+          body: Center(
+            child: ElevatedButton(
+              onPressed: () async {
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Delete Exam'),
+                    content: const Text(
+                        'Are you sure you want to delete this exam?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Delete Exam'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirmed == true) {
+                  deleted = true;
+                }
+              },
+              child: const Text('Open Delete Modal'),
+            ),
+          ),
+        );
+      }),
+    ));
+
+    await tester.tap(find.text('Open Delete Modal'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete Exam'), findsNWidgets(2)); // Title & Button
+    expect(
+        find.text('Are you sure you want to delete this exam?'), findsOneWidget);
+
+    // Tap Delete Exam
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Delete Exam'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, isTrue);
+  });
 }

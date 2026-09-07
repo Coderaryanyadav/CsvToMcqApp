@@ -160,8 +160,61 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to import: $e')),
+        );
+      }
+    }
+
+  Future<void> _deleteCurrentExam() async {
+    if (_selectedExam == null) return;
+    final examToDelete = _selectedExam!;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.delete_outline, color: AppTheme.danger, size: 24),
+            SizedBox(width: 8),
+            Text('Delete Exam'),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to delete "${examToDelete.name}" and all of its ${examToDelete.questions.length} questions?\n\nThis action cannot be undone.',
+          style: const TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.danger),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete Exam'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await StorageService.deleteExam(examToDelete.id);
+      _exams.removeWhere((e) => e.id == examToDelete.id);
+      setState(() {
+        if (_exams.isNotEmpty) {
+          _selectedExam = _exams.first;
+        } else {
+          _selectedExam = null;
+        }
+        _selectedTopic = 'All Topics';
+        _recomputeFilteredQuestions();
+      });
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to import: $e')),
+        SnackBar(
+          content: Text('Exam "${examToDelete.name}" deleted.'),
+          backgroundColor: AppTheme.danger,
+        ),
       );
     }
   }
@@ -904,6 +957,58 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       fontSize: 11,
                     ),
                   ),
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert,
+                      size: 20, color: theme.colorScheme.onSurfaceVariant),
+                  tooltip: 'Exam Options',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onSelected: (val) {
+                    if (val == 'delete') {
+                      _deleteCurrentExam();
+                    } else if (val == 'export') {
+                      if (_selectedExam != null) {
+                        final messenger = ScaffoldMessenger.of(context);
+                        ImportService.exportToCsvFile(_selectedExam!).then((path) {
+                          if (path != null) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Exported to $path'),
+                                backgroundColor: AppTheme.success,
+                              ),
+                            );
+                          }
+                        });
+                      }
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'export',
+                      child: Row(
+                        children: [
+                          Icon(Icons.file_download_outlined,
+                              size: 18, color: AppTheme.text),
+                          SizedBox(width: 8),
+                          Text('Export CSV'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuDivider(),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline,
+                              size: 18, color: AppTheme.danger),
+                          SizedBox(width: 8),
+                          Text('Delete Exam',
+                              style: TextStyle(color: AppTheme.danger)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

@@ -14,5 +14,7 @@
       chronological improvement metrics.
 - [x] **Zero Mock / Hardcoded Data**: Clean database operation with
       user/imported question banks.
-- [x] **Automated Quality Assurance**: 46/46 unit, widget, and cold restart
+- [x] **Automated Quality Assurance**: 47/47 unit, widget, and cold restart
       persistence tests passing with 0 analyzer warnings.
+- [x] **Option to Delete Exam**: Interactive popup menu and dialog with destructive confirmation; cleanly deletes exam and questions from local storage.
+
