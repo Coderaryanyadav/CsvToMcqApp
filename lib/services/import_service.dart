@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -77,7 +78,16 @@ class ImportService {
     final examName = targetExam?.name ?? '';
 
     if (filename.toLowerCase().endsWith('.csv')) {
-      final text = String.fromCharCodes(bytes);
+      String text;
+      try {
+        text = utf8.decode(bytes);
+      } catch (_) {
+        try {
+          text = latin1.decode(bytes);
+        } catch (_) {
+          text = String.fromCharCodes(bytes);
+        }
+      }
       return parseCsv(
         text,
         filename,
@@ -103,6 +113,12 @@ class ImportService {
     Set<String>? existingQuestions,
     String targetExamName = '',
   }) {
+    // Strip UTF-8 BOM if present in any representation
+    if (text.startsWith('\uFEFF')) {
+      text = text.substring(1);
+    } else if (text.startsWith('\u00EF\u00BB\u00BF') || text.startsWith('ï»¿')) {
+      text = text.substring(3);
+    }
     text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
     List<List<dynamic>> rows =
         const CsvToListConverter(eol: '\n', shouldParseNumbers: false)
@@ -148,6 +164,9 @@ class ImportService {
 
   static String _normalizeHeader(String header) {
     return header
+        .replaceAll('\uFEFF', '')
+        .replaceAll('\u00EF\u00BB\u00BF', '')
+        .replaceAll('ï»¿', '')
         .trim()
         .toLowerCase()
         .replaceAll(RegExp(r'[\s\-_\/]+'), '_')
