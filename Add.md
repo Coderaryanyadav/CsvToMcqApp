@@ -16,7 +16,7 @@
       chronological improvement metrics.
 - [x] **Zero Mock / Hardcoded Data**: Clean database operation with
       user/imported question banks.
-- [x] **Automated Quality Assurance**: 47/47 unit, widget, and cold restart
+- [x] **Automated Quality Assurance**: 50/50 unit, widget, and cold restart
       persistence tests passing with 0 analyzer warnings.
 - [x] **Option to Delete Exam**: Interactive popup menu and dialog with
       destructive confirmation; cleanly deletes exam and questions from local
@@ -29,20 +29,3 @@
 ### 🚀 Recommended Additions & Future Roadmap Backlog
 
 _(See [RECOMMENDED_ADDITIONS.md](RECOMMENDED_ADDITIONS.md) for full breakdown)_
-
-4. [ ] **Question Bookmarking & Starred Filter**: Star challenging questions for
-       targeted revision. like what wauwadsiotn i bookmark during exam only
-       theose test
-5. [ ] **LaTeX & Math Formula Rendering**: Formatted equation support for
-       physics, math, and chemistry exams.
-6. [ ] **Image / Diagram Question Support**: Attach and display diagrams in
-       question prompts and option choices.
-7. [ ] **Full Data Backup & Restore (ZIP / JSON Package)**: Portable
-       single-click export and import of all student profiles, question banks,
-       and history.
-8. [ ] **Printable PDF Mock Exam & Answer Key Export**: Generate paper-ready
-       question sets with bubble answer sheets and explanation keys.
-9. [ ] **Study Streak & Daily Goal Notifications**: Local habit-building
-       reminders and streak tracking.
-10. [ ] **Desktop Keyboard Shortcuts**: Keys `1`-`4` for options, `Arrows` for
-        navigation, `Space` to flag for review.
