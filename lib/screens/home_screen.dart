@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
+import '../services/streak_service.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
 import '../models/question.dart';
@@ -27,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Exam> exams = [];
   List<ExamPerformance> performances = [];
   StudentProfile? activeStudent;
+  StreakInfo streakInfo = const StreakInfo();
+  Set<String> _bookmarkedQuestionIds = {};
   bool loading = true;
   final TextEditingController _searchCtrl = TextEditingController();
   String _examFilter = 'All'; // All | In Progress | Not Started | Completed
@@ -48,12 +51,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final allExams = await StorageService.loadAllExams();
     final student = await StorageService.getActiveStudent();
     final allPerfs = await StorageService.loadPerformancesForActiveStudent();
+    final settings = await StorageService.loadSettings();
+    final dailyGoal = (settings['dailyGoal'] as num?)?.toInt() ?? 20;
+    final streak = StreakService.calculateStreakInfo(allPerfs, dailyGoal: dailyGoal);
+    final bookmarks = await StorageService.getBookmarkedQuestionIds(student?.id);
 
     if (!mounted) return;
     setState(() {
       exams = allExams;
       activeStudent = student;
       performances = allPerfs;
+      streakInfo = streak;
+      _bookmarkedQuestionIds = bookmarks;
       loading = false;
     });
   }
@@ -904,7 +913,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 },
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // Streak & Daily Goal Widget
+              _buildStreakAndGoalCard(),
+              const SizedBox(height: 16),
+
+              // Starred Questions Revision Banner (if bookmarks exist)
+              if (_bookmarkedQuestionIds.isNotEmpty) ...[
+                _buildStarredRevisionBanner(),
+                const SizedBox(height: 20),
+              ],
 
               // Exams Cards Section
               Row(
@@ -1112,11 +1131,260 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildStreakAndGoalCard() {
+    final isMet = streakInfo.isDailyGoalMet;
+    final progress = streakInfo.goalProgress;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.white,
+            streakInfo.currentStreak > 0
+                ? const Color(0xFFFFF7ED)
+                : const Color(0xFFF8FAFC),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: streakInfo.currentStreak > 0
+              ? const Color(0xFFFDBA74).withValues(alpha: 0.6)
+              : AppTheme.border,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: streakInfo.currentStreak > 0
+                      ? const Color(0xFFFFEDD5)
+                      : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  streakInfo.currentStreak > 0 ? '🔥' : '⚡',
+                  style: const TextStyle(fontSize: 22),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          '${streakInfo.currentStreak} Day Streak',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.text,
+                          ),
+                        ),
+                        if (streakInfo.longestStreak > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber.shade100,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Best: ${streakInfo.longestStreak}d',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      isMet
+                          ? '🎉 Daily goal completed! Great momentum.'
+                          : streakInfo.studiedToday
+                              ? '${streakInfo.dailyGoal - streakInfo.todayQuestionsAnswered} more questions to hit your daily goal.'
+                              : 'Practice questions today to build your streak!',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.secondaryText,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: isMet
+                      ? AppTheme.success.withValues(alpha: 0.12)
+                      : AppTheme.accentBlue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: isMet
+                        ? AppTheme.success.withValues(alpha: 0.4)
+                        : AppTheme.accentBlue.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isMet ? Icons.check_circle : Icons.flag_outlined,
+                      size: 14,
+                      color: isMet ? AppTheme.success : AppTheme.accentBlue,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${streakInfo.todayQuestionsAnswered}/${streakInfo.dailyGoal} Qs',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: isMet ? AppTheme.success : AppTheme.accentBlue,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 8,
+              backgroundColor: AppTheme.border,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                isMet ? AppTheme.success : const Color(0xFFF97316),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStarredRevisionBanner() {
+    final count = _bookmarkedQuestionIds.length;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFFFFFBEB),
+            Color(0xFFFEF3C7),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFFCD34D)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFFCD34D)),
+            ),
+            child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text(
+                      'Starred Questions Revision',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF92400E),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD97706),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$count Bookmarked',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Focus only on the challenging questions you starred during exams or practice.',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF78350F),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          FilledButton.icon(
+            icon: const Icon(Icons.play_arrow_rounded, size: 18),
+            label: const Text('Revise Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFD97706),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            onPressed: () {
+              if (exams.isNotEmpty) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => TakeExamScreen(
+                      exams: exams,
+                      defaultToPractice: true,
+                      defaultToStarred: true,
+                    ),
+                  ),
+                ).then((_) => _loadData());
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildExamDashboardCard(Exam exam) {
     final perf = performances.where((p) => p.examId == exam.id).toList();
     final double progressPct = (perf.isNotEmpty && exam.questions.isNotEmpty)
         ? (perf.first.percentage / 100).clamp(0.0, 1.0)
         : 0.0;
+
+    final starredInExam = exam.questions
+        .where((q) => _bookmarkedQuestionIds.contains(q.id))
+        .length;
 
     final String subtitle = exam.questions.isNotEmpty
         ? '${exam.questions.length} questions • Ready for practice'
@@ -1149,13 +1417,49 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      exam.name,
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.text,
-                      ),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            exam.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.text,
+                            ),
+                          ),
+                        ),
+                        if (starredInExam > 0) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFFCD34D)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star_rounded,
+                                    size: 13, color: Color(0xFFD97706)),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '$starredInExam',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -1336,6 +1640,32 @@ class _HomeScreenState extends State<HomeScreen> {
                               : null,
                         ),
                       ),
+                      if (starredInExam > 0) ...[
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.star_rounded, size: 16, color: Color(0xFFD97706)),
+                          label: Text('⭐ $starredInExam',
+                              style: const TextStyle(fontSize: 12, color: Color(0xFF92400E))),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            side: const BorderSide(color: Color(0xFFFCD34D)),
+                            backgroundColor: const Color(0xFFFFFBEB),
+                          ),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => TakeExamScreen(
+                                  exams: exams,
+                                  initialExamId: exam.id,
+                                  defaultToPractice: true,
+                                  defaultToStarred: true,
+                                ),
+                              ),
+                            ).then((_) => _loadData());
+                          },
+                        ),
+                      ],
                     ],
                   ),
                   const SizedBox(height: 4),
@@ -1380,6 +1710,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
 
   Widget _buildActivityTile(ExamPerformance perf) {
     final pct = perf.percentage;

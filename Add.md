@@ -21,11 +21,14 @@
 - [x] **Option to Delete Exam**: Interactive popup menu and dialog with
       destructive confirmation; cleanly deletes exam and questions from local
       storage.
-- [x] **macOS Desktop Native Run**: Swift Package Manager integration with
-      Impeller Metal graphics acceleration.
+- [x] **Question Bookmarking & Starred Revision Filter**: Star challenging questions in exams, practice, or question bank; filter revision exams to practice exclusively starred questions.
+- [x] **Full Data Backup & Restore Package**: Portable single-click export and import of all student profiles, question banks, bookmarks, settings, and performance history in JSON format.
+- [x] **Study Streak & Daily Goal Tracking**: Local habit-building tracking with consecutive study day streaks 🔥, daily question goals, and dashboard progress bars.
+- [x] **Desktop Keyboard Shortcuts**: Keys `1`-`4` / `A`-`D` for option selection, `Left`/`Right` arrows for question navigation, `Space` for explanation/flag, `M` for bookmark, and `Enter` to advance/finish.
 
 ---
 
 ### 🚀 Recommended Additions & Future Roadmap Backlog
 
 _(See [RECOMMENDED_ADDITIONS.md](RECOMMENDED_ADDITIONS.md) for full breakdown)_
+

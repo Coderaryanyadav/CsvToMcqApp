@@ -5,6 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import '../models/student_profile.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
+import '../services/backup_service.dart';
 import '../theme/app_theme.dart';
 import 'welcome_screen.dart';
 
@@ -24,6 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'defaultDuration': 30,
     'defaultQuestionCount': 20,
     'defaultPassingScore': 75,
+    'dailyGoal': 20,
   };
   bool loading = true;
   StudentProfile? activeStudent;
@@ -55,19 +57,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _exportAllData() async {
     try {
-      final exams = await StorageService.loadAllExams();
-      final perfs = StorageService.loadAllPerformances();
-      final bundle = {
-        'schemaVersion': 1,
-        'exportedAt': DateTime.now().toIso8601String(),
-        'exams': exams.map((e) => e.toJson()).toList(),
-        'performances': perfs.map((p) => p.toJson()).toList(),
-      };
-      final jsonText = const JsonEncoder.withIndent('  ').convert(bundle);
+      final fullData = await StorageService.exportFullBackupData();
+      final jsonText = const JsonEncoder.withIndent('  ').convert(fullData);
       final outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Backup JSON',
+        dialogTitle: 'Save Full QuizPro Backup Package',
         fileName:
-            'quizpro_backup_${DateTime.now().millisecondsSinceEpoch}.json',
+            'QuizPro_Full_Backup_${DateTime.now().millisecondsSinceEpoch}.json',
         type: FileType.custom,
         allowedExtensions: ['json'],
       );
@@ -78,7 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Backup exported successfully!'),
+              content: Text('Complete package exported successfully!'),
               backgroundColor: AppTheme.success,
             ),
           );
@@ -94,6 +89,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  Future<void> _restoreBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.restore_page_outlined, color: AppTheme.accentBlue, size: 24),
+            SizedBox(width: 8),
+            Text('Restore From Backup'),
+          ],
+        ),
+        content: const Text(
+          'Restoring a backup will merge and update all student profiles, exam tracks, question banks, bookmarks, and past attempt history.\n\nWould you like to proceed and select a backup JSON file?',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Select Backup File'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final result = await BackupService.pickAndRestoreBackup();
+    if (!mounted) return;
+
+    if (result.success) {
+      await _loadSettings();
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Row(
+            children: [
+              Icon(Icons.check_circle, color: AppTheme.success, size: 24),
+              SizedBox(width: 8),
+              Text('Restore Complete'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${result.message}\n',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              _buildRestoreStat('Student Profiles', result.studentsRestored),
+              _buildRestoreStat('Exam Question Banks', result.examsRestored),
+              _buildRestoreStat('Practice Performances', result.performancesRestored),
+              _buildRestoreStat('Bookmarked Questions', result.bookmarksRestored),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    } else if (result.message != 'No file selected.') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: AppTheme.danger,
+        ),
+      );
+    }
+  }
+
+  Widget _buildRestoreStat(String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
+          Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
   }
 
   Future<void> _saveSampleCsv() async {
@@ -136,7 +223,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Reset All Application Data?'),
         content: const Text(
-          'This will permanently delete all created exams, question banks, and practice attempt history. This action cannot be undone.',
+          'This will permanently delete all created exams, question banks, bookmarks, and practice attempt history. This action cannot be undone.',
         ),
         actions: [
           TextButton(
@@ -154,6 +241,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     if (confirm == true) {
       await StorageService.clearAllData();
+      await _loadSettings();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -263,11 +351,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 2. EXAM DEFAULTS SECTION
-                _sectionHeader('Exam & Practice Defaults', Icons.tune_outlined),
+                // 2. EXAM DEFAULTS & DAILY GOAL SECTION
+                _sectionHeader('Exam & Study Habit Targets', Icons.tune_outlined),
                 Card(
                   child: Column(
                     children: [
+                      ListTile(
+                        leading: const Icon(Icons.local_fire_department_outlined,
+                            color: Color(0xFFEA580C)),
+                        title: const Text('Daily Study Question Goal',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: const Text(
+                            'Target number of questions to answer each day for streak tracking'),
+                        trailing: DropdownButton<int>(
+                          value:
+                              (settings['dailyGoal'] as num?)?.toInt() ?? 20,
+                          underline: const SizedBox(),
+                          items: const [
+                            DropdownMenuItem(value: 5, child: Text('5 Questions')),
+                            DropdownMenuItem(value: 10, child: Text('10 Questions')),
+                            DropdownMenuItem(value: 15, child: Text('15 Questions')),
+                            DropdownMenuItem(value: 20, child: Text('20 Questions')),
+                            DropdownMenuItem(value: 30, child: Text('30 Questions')),
+                            DropdownMenuItem(value: 50, child: Text('50 Questions')),
+                          ],
+                          onChanged: (v) {
+                            if (v != null) _updateSetting('dailyGoal', v);
+                          },
+                        ),
+                      ),
+                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.timer_outlined),
                         title: const Text('Default Exam Duration',
@@ -326,7 +439,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 3. FEEDBACK SECTION
+                // 3. DESKTOP KEYBOARD SHORTCUTS SECTION
+                _sectionHeader('Desktop Keyboard Shortcuts', Icons.keyboard_outlined),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        _buildShortcutRow('1, 2, 3, 4  or  A, B, C, D', 'Select Option (A, B, C, D)'),
+                        const Divider(height: 14),
+                        _buildShortcutRow('Left Arrow / Right Arrow', 'Navigate to Previous / Next Question'),
+                        const Divider(height: 14),
+                        _buildShortcutRow('Spacebar', 'Toggle Explanation (Practice) / Flag for Review (Exam)'),
+                        const Divider(height: 14),
+                        _buildShortcutRow('M Key', 'Star / Bookmark Question for Revision'),
+                        const Divider(height: 14),
+                        _buildShortcutRow('Enter', 'Advance to Next Question / Finish Session'),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 4. FEEDBACK SECTION
                 _sectionHeader(
                     'Feedback & Interaction', Icons.touch_app_outlined),
                 Card(
@@ -356,7 +491,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 4. DATA & BACKUP SECTION
+                // 5. DATA & BACKUP SECTION
                 _sectionHeader('Data & Storage', Icons.folder_zip_outlined),
                 Card(
                   child: Column(
@@ -364,13 +499,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ListTile(
                         leading: const Icon(Icons.file_download_outlined,
                             color: AppTheme.accentBlue),
-                        title: const Text('Export Complete Data Backup',
+                        title: const Text('Export Full Backup Package',
                             style: TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text(
-                            'Save all exams, question banks, and history to a JSON file'),
+                            'Export all students, exams, question banks, bookmarks & history'),
                         trailing: OutlinedButton(
                           onPressed: _exportAllData,
                           child: const Text('Export JSON'),
+                        ),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(Icons.restore_page_outlined,
+                            color: AppTheme.accentBlue),
+                        title: const Text('Restore Full Backup Package',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: const Text(
+                            'Restore student profiles, questions, and attempt history'),
+                        trailing: OutlinedButton(
+                          onPressed: _restoreBackup,
+                          child: const Text('Restore JSON'),
                         ),
                       ),
                       const Divider(height: 1),
@@ -407,6 +555,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
+
 
                 // 5. ABOUT SECTION
                 _sectionHeader('About', Icons.info_outline),
@@ -455,6 +604,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildShortcutRow(String keys, String description) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: Text(
+            keys,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              fontFamily: 'monospace',
+              color: AppTheme.text,
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Text(
+            description,
+            style: const TextStyle(fontSize: 13, color: AppTheme.text),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _sectionHeader(String title, IconData icon) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10, left: 4),
@@ -475,3 +655,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+

@@ -40,6 +40,10 @@ class StorageService {
     await _repo.deleteStudent(id);
   }
 
+  static Future<String?> getActiveStudentId() async {
+    return _repo.getActiveStudentId();
+  }
+
   static Future<StudentProfile?> getActiveStudent() async {
     final activeId = await _repo.getActiveStudentId();
     if (activeId == null) return null;
@@ -136,6 +140,32 @@ class StorageService {
 
   static Future<void> clearAllData() async {
     await _repo.clearAllData();
+  }
+
+  // Bookmarks
+  static Future<Set<String>> getBookmarkedQuestionIds([String? studentId]) async {
+    final id = studentId ?? (await getActiveStudentId()) ?? 'default';
+    return _repo.getBookmarkedQuestionIds(id);
+  }
+
+  static Future<bool> toggleBookmark(String questionId, {String? studentId}) async {
+    final id = studentId ?? (await getActiveStudentId()) ?? 'default';
+    await _repo.toggleBookmark(id, questionId);
+    return _repo.isQuestionBookmarked(id, questionId);
+  }
+
+  static Future<bool> isQuestionBookmarked(String questionId, {String? studentId}) async {
+    final id = studentId ?? (await getActiveStudentId()) ?? 'default';
+    return _repo.isQuestionBookmarked(id, questionId);
+  }
+
+  // Full Backup & Restore
+  static Future<Map<String, dynamic>> exportFullBackupData() async {
+    return _repo.exportFullBackupData();
+  }
+
+  static Future<void> restoreFullBackupData(Map<String, dynamic> data) async {
+    await _repo.restoreFullBackupData(data);
   }
 
   static Future<void> seedStarterDataIfEmpty() async {

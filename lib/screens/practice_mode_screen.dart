@@ -31,12 +31,14 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
   int current = 0;
   final Map<int, Set<int>> _answers = {};
   final Map<int, bool> _revealed = {};
+  Set<String> _bookmarkedIds = {};
   Timer? _timer;
   late int _remainingSeconds;
   int _elapsedSeconds = 0;
   DateTime? _questionStartTime;
   final Map<String, int> _timeSpent = {};
   bool _isFinishing = false;
+  final FocusNode _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -46,7 +48,18 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
     for (var q in widget.questions) {
       _timeSpent[q.id] = 0;
     }
+    _loadBookmarks();
     _startTimer();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final activeStudent = await StorageService.getActiveStudent();
+    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    if (mounted) {
+      setState(() {
+        _bookmarkedIds = ids;
+      });
+    }
   }
 
   void _startTimer() {
@@ -67,7 +80,70 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _handleKeyEvent(KeyEvent event) {
+    if (event is! KeyDownEvent) return;
+
+    if (current >= widget.questions.length) return;
+    final q = widget.questions[current];
+
+    if (event.logicalKey == LogicalKeyboardKey.digit1 ||
+        event.logicalKey == LogicalKeyboardKey.numpad1 ||
+        event.logicalKey == LogicalKeyboardKey.keyA) {
+      _toggleOption(0, q.isMultiple);
+    } else if (event.logicalKey == LogicalKeyboardKey.digit2 ||
+        event.logicalKey == LogicalKeyboardKey.numpad2 ||
+        event.logicalKey == LogicalKeyboardKey.keyB) {
+      _toggleOption(1, q.isMultiple);
+    } else if (event.logicalKey == LogicalKeyboardKey.digit3 ||
+        event.logicalKey == LogicalKeyboardKey.numpad3 ||
+        event.logicalKey == LogicalKeyboardKey.keyC) {
+      _toggleOption(2, q.isMultiple);
+    } else if (event.logicalKey == LogicalKeyboardKey.digit4 ||
+        event.logicalKey == LogicalKeyboardKey.numpad4 ||
+        event.logicalKey == LogicalKeyboardKey.keyD) {
+      _toggleOption(3, q.isMultiple);
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+      if (current < widget.questions.length - 1) {
+        _navigateToQuestion(current + 1);
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+      if (current > 0) {
+        _navigateToQuestion(current - 1);
+      }
+    } else if (event.logicalKey == LogicalKeyboardKey.space) {
+      setState(() {
+        _revealed[current] = !(_revealed[current] == true);
+      });
+    } else if (event.logicalKey == LogicalKeyboardKey.keyM) {
+      _toggleBookmark();
+    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (current < widget.questions.length - 1) {
+        _navigateToQuestion(current + 1);
+      } else {
+        _finishPractice();
+      }
+    }
+  }
+
+  Future<void> _toggleBookmark() async {
+    if (current >= widget.questions.length) return;
+    final qId = widget.questions[current].id;
+    final activeStudent = await StorageService.getActiveStudent();
+    final isStarred = await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
+
+    setState(() {
+      if (isStarred) {
+        _bookmarkedIds.add(qId);
+      } else {
+        _bookmarkedIds.remove(qId);
+      }
+    });
+    HapticFeedback.lightImpact();
   }
 
   void _trackQuestionTime() {
@@ -394,176 +470,199 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
     final questionsLeft = widget.questions.length - current - 1;
     final progress = (current + 1) / widget.questions.length;
 
-    return Scaffold(
-      backgroundColor: AppTheme.background,
-      appBar: AppBar(
-        title: Text(widget.examName != null
-            ? '${widget.examName} — Practice'
-            : 'Practice Mode'),
-      ),
-      body: Column(
-        children: [
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryNavy,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        q.displayId,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEBF2FA),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.timer_outlined,
-                              size: 15, color: AppTheme.primaryNavy),
-                          const SizedBox(width: 6),
-                          Text(
-                            _formatTimer(_remainingSeconds),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: AppTheme.primaryNavy,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Text(
-                      '$questionsLeft Left',
-                      style: const TextStyle(
-                        color: AppTheme.secondaryText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: const Text(
-                        'Practice',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppTheme.success,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 4,
-                    backgroundColor: AppTheme.border,
-                    valueColor: const AlwaysStoppedAnimation<Color>(
-                        AppTheme.accentBlue),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+    final isStarred = _bookmarkedIds.contains(q.id);
+
+    return KeyboardListener(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        backgroundColor: AppTheme.background,
+        appBar: AppBar(
+          title: Text(widget.examName != null
+              ? '${widget.examName} — Practice'
+              : 'Practice Mode'),
+        ),
+        body: Column(
+          children: [
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Card(
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          side: const BorderSide(color: AppTheme.border),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryNavy,
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(20.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: isMultiple
-                                          ? const Color(0xFFF3E8FF)
-                                          : const Color(0xFFDBEAFE),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text(
-                                      isMultiple
-                                          ? 'MULTIPLE SELECT'
-                                          : 'SINGLE SELECT',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: isMultiple
-                                            ? const Color(0xFF6B21A8)
-                                            : AppTheme.accentBlue,
-                                      ),
-                                    ),
-                                  ),
-                                  if (q.topic != null &&
-                                      q.topic!.isNotEmpty) ...[
-                                    const SizedBox(width: 8),
+                        child: Text(
+                          q.displayId,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEBF2FA),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.timer_outlined,
+                                size: 15, color: AppTheme.primaryNavy),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatTimer(_remainingSeconds),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: AppTheme.primaryNavy,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        '$questionsLeft Left',
+                        style: const TextStyle(
+                          color: AppTheme.secondaryText,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Practice',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.success,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 4,
+                      backgroundColor: AppTheme.border,
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          AppTheme.accentBlue),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 800),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Card(
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: AppTheme.border),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(20.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFFF3F4F6),
+                                        color: isMultiple
+                                            ? const Color(0xFFF3E8FF)
+                                            : const Color(0xFFDBEAFE),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
-                                        q.topic!,
-                                        style: const TextStyle(
+                                        isMultiple
+                                            ? 'MULTIPLE SELECT'
+                                            : 'SINGLE SELECT',
+                                        style: TextStyle(
                                           fontSize: 11,
-                                          color: AppTheme.secondaryText,
-                                          fontWeight: FontWeight.w500,
+                                          fontWeight: FontWeight.w700,
+                                          color: isMultiple
+                                              ? const Color(0xFF6B21A8)
+                                              : AppTheme.accentBlue,
                                         ),
                                       ),
                                     ),
-                                  ],
-                                  const Spacer(),
-                                  Text(
-                                    'Question ${current + 1} of ${widget.questions.length}',
-                                    style: const TextStyle(
-                                      color: AppTheme.secondaryText,
-                                      fontSize: 13,
+                                    if (q.topic != null &&
+                                        q.topic!.isNotEmpty) ...[
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF3F4F6),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          q.topic!,
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: AppTheme.secondaryText,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                    const Spacer(),
+                                    IconButton(
+                                      tooltip: isStarred
+                                          ? 'Star / Bookmark Question (M)'
+                                          : 'Star / Bookmark Question (M)',
+                                      icon: Icon(
+                                        isStarred
+                                            ? Icons.star_rounded
+                                            : Icons.star_outline_rounded,
+                                        color: isStarred
+                                            ? Colors.amber.shade700
+                                            : Colors.grey,
+                                        size: 22,
+                                      ),
+                                      onPressed: _toggleBookmark,
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${current + 1}/${widget.questions.length}',
+                                      style: const TextStyle(
+                                        color: AppTheme.secondaryText,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               if (isMultiple) ...[
                                 const SizedBox(height: 8),
                                 const Text(
@@ -859,6 +958,7 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

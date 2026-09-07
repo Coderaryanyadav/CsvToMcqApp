@@ -34,6 +34,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   int current = 0;
   final Map<String, Set<int>> answers = {};
   final Set<String> marked = {};
+  Set<String> _bookmarkedIds = {};
   Timer? _autosaveTimer;
   DateTime? _questionStartTime;
   final Map<String, int> _timeSpent = {};
@@ -52,7 +53,18 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       _timeSpent[q.id] = 0;
     }
     _questionStartTime = DateTime.now();
+    _loadBookmarks();
     _tryResumeSession();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final activeStudent = await StorageService.getActiveStudent();
+    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    if (mounted) {
+      setState(() {
+        _bookmarkedIds = ids;
+      });
+    }
   }
 
   @override
@@ -335,15 +347,19 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     if (event is! KeyDownEvent) return;
 
     if (event.logicalKey == LogicalKeyboardKey.digit1 ||
+        event.logicalKey == LogicalKeyboardKey.numpad1 ||
         event.logicalKey == LogicalKeyboardKey.keyA) {
       _selectOption(0);
     } else if (event.logicalKey == LogicalKeyboardKey.digit2 ||
+        event.logicalKey == LogicalKeyboardKey.numpad2 ||
         event.logicalKey == LogicalKeyboardKey.keyB) {
       _selectOption(1);
     } else if (event.logicalKey == LogicalKeyboardKey.digit3 ||
+        event.logicalKey == LogicalKeyboardKey.numpad3 ||
         event.logicalKey == LogicalKeyboardKey.keyC) {
       _selectOption(2);
     } else if (event.logicalKey == LogicalKeyboardKey.digit4 ||
+        event.logicalKey == LogicalKeyboardKey.numpad4 ||
         event.logicalKey == LogicalKeyboardKey.keyD) {
       _selectOption(3);
     } else if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
@@ -354,8 +370,16 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       if (current > 0) {
         _navigateToQuestion(current - 1);
       }
-    } else if (event.logicalKey == LogicalKeyboardKey.keyM) {
+    } else if (event.logicalKey == LogicalKeyboardKey.space ||
+        event.logicalKey == LogicalKeyboardKey.keyM) {
       _toggleBookmark();
+    } else if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      if (current < widget.questions.length - 1) {
+        _navigateToQuestion(current + 1);
+      } else {
+        _submitExam();
+      }
     }
   }
 
@@ -379,13 +403,21 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     HapticFeedback.selectionClick();
   }
 
-  void _toggleBookmark() {
+  Future<void> _toggleBookmark() async {
     final qId = widget.questions[current].id;
+    final activeStudent = await StorageService.getActiveStudent();
+    final isStarred = await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
+
     setState(() {
       if (marked.contains(qId)) {
         marked.remove(qId);
       } else {
         marked.add(qId);
+      }
+      if (isStarred) {
+        _bookmarkedIds.add(qId);
+      } else {
+        _bookmarkedIds.remove(qId);
       }
     });
     HapticFeedback.lightImpact();
@@ -723,19 +755,44 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                               ],
                               const Spacer(),
                               IconButton.filledTonal(
+                                tooltip: _bookmarkedIds.contains(q.id)
+                                    ? 'Star / Bookmark Question (Space)'
+                                    : 'Star / Bookmark Question (Space)',
+                                icon: Icon(
+                                  _bookmarkedIds.contains(q.id)
+                                      ? Icons.star_rounded
+                                      : Icons.star_outline_rounded,
+                                  color: _bookmarkedIds.contains(q.id)
+                                      ? Colors.amber.shade700
+                                      : Colors.grey,
+                                  size: isMobile ? 20 : 24,
+                                ),
+                                onPressed: _toggleBookmark,
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton.filledTonal(
                                 tooltip: isBookmarked
-                                    ? 'Unmark Question'
-                                    : 'Mark for Review (M)',
+                                    ? 'Unflag from Review (M)'
+                                    : 'Flag for Review (M)',
                                 icon: Icon(
                                   isBookmarked
-                                      ? Icons.bookmark
-                                      : Icons.bookmark_border,
+                                      ? Icons.flag_rounded
+                                      : Icons.outlined_flag_rounded,
                                   color: isBookmarked
                                       ? AppTheme.warning
                                       : Colors.grey,
                                   size: isMobile ? 18 : 22,
                                 ),
-                                onPressed: _toggleBookmark,
+                                onPressed: () {
+                                  setState(() {
+                                    if (marked.contains(q.id)) {
+                                      marked.remove(q.id);
+                                    } else {
+                                      marked.add(q.id);
+                                    }
+                                  });
+                                  HapticFeedback.lightImpact();
+                                },
                               ),
                             ],
                           ),

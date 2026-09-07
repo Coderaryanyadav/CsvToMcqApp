@@ -29,6 +29,15 @@ abstract class IStorageRepository {
   Future<void> deleteStudent(String id);
   Future<String?> getActiveStudentId();
   Future<void> setActiveStudentId(String id);
+
+  // Bookmarks
+  Future<Set<String>> getBookmarkedQuestionIds(String studentId);
+  Future<void> toggleBookmark(String studentId, String questionId);
+  Future<bool> isQuestionBookmarked(String studentId, String questionId);
+
+  // Full Backup & Restore
+  Future<Map<String, dynamic>> exportFullBackupData();
+  Future<void> restoreFullBackupData(Map<String, dynamic> data);
 }
 
 class IoStorageRepository implements IStorageRepository {
@@ -42,6 +51,7 @@ class IoStorageRepository implements IStorageRepository {
   List<ExamPerformance>? _cachedPerformances;
   List<StudentProfile>? _cachedStudents;
   Map<String, dynamic>? _cachedSettings;
+  final Map<String, Set<String>> _cachedBookmarks = {};
 
   @override
   Future<void> init() async {
@@ -53,6 +63,135 @@ class IoStorageRepository implements IStorageRepository {
       await mcqDir.create(recursive: true);
     }
     _initialized = true;
+  }
+
+  @override
+  Future<Set<String>> getBookmarkedQuestionIds(String studentId) async {
+    await init();
+    if (_cachedBookmarks.containsKey(studentId)) {
+      return Set<String>.from(_cachedBookmarks[studentId]!);
+    }
+    final file = File('${mcqDir.path}/bookmarks_$studentId.json');
+    if (!await file.exists()) {
+      _cachedBookmarks[studentId] = <String>{};
+      return <String>{};
+    }
+    try {
+      final text = await file.readAsString();
+      final list = jsonDecode(text) as List<dynamic>;
+      final set = list.map((e) => e.toString()).toSet();
+      _cachedBookmarks[studentId] = set;
+      return Set<String>.from(set);
+    } catch (_) {
+      _cachedBookmarks[studentId] = <String>{};
+      return <String>{};
+    }
+  }
+
+  @override
+  Future<void> toggleBookmark(String studentId, String questionId) async {
+    await init();
+    final bookmarks = await getBookmarkedQuestionIds(studentId);
+    if (bookmarks.contains(questionId)) {
+      bookmarks.remove(questionId);
+    } else {
+      bookmarks.add(questionId);
+    }
+    _cachedBookmarks[studentId] = bookmarks;
+    final file = File('${mcqDir.path}/bookmarks_$studentId.json');
+    await file.writeAsString(jsonEncode(bookmarks.toList()), flush: true);
+  }
+
+  @override
+  Future<bool> isQuestionBookmarked(String studentId, String questionId) async {
+    final bookmarks = await getBookmarkedQuestionIds(studentId);
+    return bookmarks.contains(questionId);
+  }
+
+  @override
+  Future<Map<String, dynamic>> exportFullBackupData() async {
+    await init();
+    final exams = await getAllExams();
+    final students = await getAllStudents();
+    final perfs = await getAllPerformances();
+    final settings = await getSettings();
+    final activeStudentId = await getActiveStudentId();
+
+    final Map<String, List<String>> bookmarksMap = {};
+    for (final s in students) {
+      final b = await getBookmarkedQuestionIds(s.id);
+      if (b.isNotEmpty) {
+        bookmarksMap[s.id] = b.toList();
+      }
+    }
+
+    return {
+      'app': 'QuizPro',
+      'version': 1,
+      'exportedAt': DateTime.now().toIso8601String(),
+      'activeStudentId': activeStudentId,
+      'settings': settings,
+      'students': students.map((s) => s.toJson()).toList(),
+      'exams': exams.map((e) => e.toJson()).toList(),
+      'performances': perfs.map((p) => p.toJson()).toList(),
+      'bookmarks': bookmarksMap,
+    };
+  }
+
+  @override
+  Future<void> restoreFullBackupData(Map<String, dynamic> data) async {
+    await init();
+    if (data['students'] != null) {
+      final list = (data['students'] as List<dynamic>)
+          .map((s) => StudentProfile.fromJson(s as Map<String, dynamic>))
+          .toList();
+      for (final s in list) {
+        await saveStudent(s);
+      }
+    }
+
+    if (data['settings'] != null) {
+      await saveSettings(Map<String, dynamic>.from(data['settings'] as Map));
+    }
+
+    if (data['activeStudentId'] != null) {
+      await setActiveStudentId(data['activeStudentId'].toString());
+    }
+
+    if (data['exams'] != null) {
+      final list = (data['exams'] as List<dynamic>)
+          .map((e) => Exam.fromJson(e as Map<String, dynamic>))
+          .toList();
+      for (final e in list) {
+        await saveExam(e);
+      }
+    }
+
+    if (data['performances'] != null) {
+      final list = (data['performances'] as List<dynamic>)
+          .map((p) => ExamPerformance.fromJson(p as Map<String, dynamic>))
+          .toList();
+      for (final p in list) {
+        await savePerformance(p);
+      }
+    }
+
+    if (data['bookmarks'] != null) {
+      final map = data['bookmarks'] as Map<String, dynamic>;
+      for (final entry in map.entries) {
+        final studentId = entry.key;
+        final list = (entry.value as List<dynamic>).map((e) => e.toString()).toSet();
+        _cachedBookmarks[studentId] = list;
+        final file = File('${mcqDir.path}/bookmarks_$studentId.json');
+        await file.writeAsString(jsonEncode(list.toList()), flush: true);
+      }
+    }
+
+    // Invalidate caches to ensure clean fresh reload
+    _cachedExams = null;
+    _cachedPerformances = null;
+    _cachedStudents = null;
+    _cachedSettings = null;
   }
 
   @override

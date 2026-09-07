@@ -29,7 +29,9 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   String _selectedTopic = 'All Topics';
   String _selectedDifficulty = 'All';
   String _selectedType = 'All';
+  bool _onlyStarred = false;
   bool _sortAscending = true;
+  Set<String> _bookmarkedIds = {};
   List<Question> _cachedFilteredList = [];
 
   @override
@@ -46,7 +48,33 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
         _selectedExam = _exams.first;
       }
     }
+    _loadBookmarks();
     _recomputeFilteredQuestions();
+  }
+
+  Future<void> _loadBookmarks() async {
+    final activeStudent = await StorageService.getActiveStudent();
+    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    if (mounted) {
+      setState(() {
+        _bookmarkedIds = ids;
+        _recomputeFilteredQuestions();
+      });
+    }
+  }
+
+  Future<void> _toggleBookmark(String questionId) async {
+    final activeStudent = await StorageService.getActiveStudent();
+    final isStarred = await StorageService.toggleBookmark(questionId,
+        studentId: activeStudent?.id);
+    setState(() {
+      if (isStarred) {
+        _bookmarkedIds.add(questionId);
+      } else {
+        _bookmarkedIds.remove(questionId);
+      }
+      _recomputeFilteredQuestions();
+    });
   }
 
   @override
@@ -95,6 +123,11 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
       } else if (_selectedType == 'Multiple') {
         list = list.where((q) => q.isMultiple).toList();
       }
+    }
+
+    // Starred / Bookmarked only
+    if (_onlyStarred) {
+      list = list.where((q) => _bookmarkedIds.contains(q.id)).toList();
     }
 
     // Sort by ID number
@@ -1108,6 +1141,36 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
+                      // Starred Filter Chip
+                      FilterChip(
+                        avatar: Icon(
+                          _onlyStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                          size: 16,
+                          color: _onlyStarred ? const Color(0xFF92400E) : Colors.grey,
+                        ),
+                        label: Text(
+                          'Starred (${_selectedExam != null ? _selectedExam!.questions.where((q) => _bookmarkedIds.contains(q.id)).length : 0})',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: _onlyStarred ? FontWeight.bold : FontWeight.normal,
+                            color: _onlyStarred ? const Color(0xFF92400E) : AppTheme.text,
+                          ),
+                        ),
+                        selected: _onlyStarred,
+                        selectedColor: const Color(0xFFFEF3C7),
+                        checkmarkColor: const Color(0xFF92400E),
+                        side: BorderSide(
+                          color: _onlyStarred ? const Color(0xFFFCD34D) : Colors.grey.shade300,
+                        ),
+                        onSelected: (v) {
+                          setState(() {
+                            _onlyStarred = v;
+                            _recomputeFilteredQuestions();
+                          });
+                        },
+                      ),
+                      const SizedBox(width: 16),
+
                       // Topic Filter
                       DropdownButton<String>(
                         value: _selectedTopic,
@@ -1248,6 +1311,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final q = questions[index];
+                      final isStarred = _bookmarkedIds.contains(q.id);
                       final displayLabel = q.displayNumber != null
                           ? 'Q${q.displayNumber}'
                           : 'Q${index + 1}';
@@ -1256,8 +1320,14 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                           side: BorderSide(
-                              color: theme.colorScheme.outlineVariant),
+                            color: isStarred
+                                ? const Color(0xFFFCD34D)
+                                : theme.colorScheme.outlineVariant,
+                          ),
                         ),
+                        color: isStarred
+                            ? const Color(0xFFFFFDF5)
+                            : Colors.white,
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -1310,6 +1380,26 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                     ),
                                   ),
                                   const Spacer(),
+                                  // Star Bookmark Action Button
+                                  IconButton(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(),
+                                    icon: Icon(
+                                      isStarred
+                                          ? Icons.star_rounded
+                                          : Icons.star_outline_rounded,
+                                      color: isStarred
+                                          ? const Color(0xFFD97706)
+                                          : Colors.grey.shade400,
+                                      size: 22,
+                                    ),
+                                    tooltip: isStarred
+                                        ? 'Remove Bookmark / Star'
+                                        : 'Star Question for Targeted Revision',
+                                    onPressed: () => _toggleBookmark(q.id),
+                                  ),
+                                  const SizedBox(width: 8),
                                   // Action Icons
                                   IconButton(
                                     visualDensity: VisualDensity.compact,
@@ -1354,6 +1444,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                   ),
                                 ],
                               ),
+
                               const SizedBox(height: 8),
                               // Question Text
                               Text(

@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/exam.dart';
 import '../models/question.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'exam_screen.dart';
 import 'practice_mode_screen.dart';
@@ -10,12 +11,14 @@ class TakeExamScreen extends StatefulWidget {
   final List<Exam> exams;
   final String? initialExamId;
   final bool defaultToPractice;
+  final bool defaultToStarred;
 
   const TakeExamScreen({
     super.key,
     required this.exams,
     this.initialExamId,
     this.defaultToPractice = false,
+    this.defaultToStarred = false,
   });
 
   @override
@@ -25,6 +28,8 @@ class TakeExamScreen extends StatefulWidget {
 class _TakeExamScreenState extends State<TakeExamScreen> {
   Exam? selectedExam;
   bool isPracticeMode = true;
+  bool onlyStarred = false;
+  Set<String> _bookmarkedIds = {};
   int selectedQuestionCount = 20;
   bool isAllQuestions = false;
   bool isCustomCount = false;
@@ -45,6 +50,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   void initState() {
     super.initState();
     isPracticeMode = widget.defaultToPractice;
+    onlyStarred = widget.defaultToStarred;
+    _loadBookmarks();
     if (widget.exams.isNotEmpty) {
       if (widget.initialExamId != null) {
         selectedExam = widget.exams.firstWhere(
@@ -55,6 +62,16 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         selectedExam = widget.exams.first;
       }
       _initExamData();
+    }
+  }
+
+  Future<void> _loadBookmarks() async {
+    final activeStudent = await StorageService.getActiveStudent();
+    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    if (mounted) {
+      setState(() {
+        _bookmarkedIds = ids;
+      });
     }
   }
 
@@ -89,9 +106,17 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     selectedTopic = 'All Topics';
   }
 
+  int get _starredQuestionsCount {
+    if (selectedExam == null) return 0;
+    return selectedExam!.questions.where((q) => _bookmarkedIds.contains(q.id)).length;
+  }
+
   int get _availableQuestionsCount {
     if (selectedExam == null) return 0;
     var list = List<Question>.from(selectedExam!.questions);
+    if (onlyStarred) {
+      list = list.where((q) => _bookmarkedIds.contains(q.id)).toList();
+    }
     if (selectedTopic != 'All Topics') {
       list = list.where((q) => q.topic == selectedTopic).toList();
     }
@@ -118,6 +143,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   String? get _questionCountError {
     final available = _availableQuestionsCount;
     if (available == 0) {
+      if (onlyStarred) {
+        return 'No starred / bookmarked questions found in "${selectedExam?.name ?? 'Exam'}". Star questions during practice or in the Question Bank first.';
+      }
       return 'No questions available in "${selectedExam?.name ?? 'Exam'}" with current filters.';
     }
     final requested = _effectiveQuestionCount;
@@ -133,6 +161,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   List<Question> _getFilteredQuestions() {
     if (selectedExam == null) return [];
     var questions = List<Question>.from(selectedExam!.questions);
+
+    if (onlyStarred) {
+      questions.retainWhere((q) => _bookmarkedIds.contains(q.id));
+    }
 
     if (selectedTopic != 'All Topics') {
       questions.retainWhere((q) => q.topic == selectedTopic);
@@ -621,6 +653,27 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         const Divider(height: 20),
 
                         // Switches
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          secondary: Icon(
+                            onlyStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                            color: onlyStarred ? Colors.amber.shade700 : AppTheme.secondaryText,
+                          ),
+                          title: const Text('⭐ Starred Questions Only (Revision Mode)',
+                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          subtitle: Text(
+                              'Target $_starredQuestionsCount starred question(s) in "${selectedExam?.name ?? 'Exam'}"'),
+                          value: onlyStarred,
+                          onChanged: (v) {
+                            setState(() {
+                              onlyStarred = v;
+                              if (v) {
+                                isAllQuestions = true;
+                              }
+                            });
+                          },
+                        ),
+                        const Divider(height: 12),
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           title: const Text('Shuffle Questions',
