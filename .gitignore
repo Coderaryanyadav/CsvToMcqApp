@@ -1,45 +1,101 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+# ---------------------------------------------------------
+# Flutter / Dart
+# ---------------------------------------------------------
+.dart_tool/
+.packages
+.pub/
+.pub-cache/
+build/
+coverage/
+test_cache/
+.flutter-plugins
+.flutter-plugins-dependencies
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/macos/Flutter/.last_build_id
 
-# IntelliJ related
+# ---------------------------------------------------------
+# Symbolication & Obfuscation
+# ---------------------------------------------------------
+app.*.symbols
+app.*.map.json
+
+# ---------------------------------------------------------
+# Environment & Secrets (Never commit secrets)
+# ---------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+*.mobileprovision
+*.jks
+*.keystore
+secrets/
+credentials/
+
+# ---------------------------------------------------------
+# Android
+# ---------------------------------------------------------
+.gradle/
+android/local.properties
+android/.gradle/
+android/app/debug/
+android/app/profile/
+android/app/release/
+android/captures/
+**/android/app/build/
+**/android/build/
+*.apk
+*.aab
+
+# ---------------------------------------------------------
+# iOS / macOS / Xcode
+# ---------------------------------------------------------
+**/ios/Flutter/ephemeral/
+**/macos/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/macos/Flutter/Generated.xcconfig
+**/Pods/
+**/DerivedData/
+**/XCBuildData/
+**/SourcePackages/
+**/*.xcworkspace/xcuserdata/
+**/*.xcodeproj/xcuserdata/
+**/*.xcodeproj/project.xcworkspace/xcuserdata/
+
+# ---------------------------------------------------------
+# IDE / Editors
+# ---------------------------------------------------------
+.idea/
 *.iml
 *.ipr
 *.iws
-.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/launch.json
+!.vscode/extensions.json
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
+# ---------------------------------------------------------
+# Operating System files
+# ---------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.AppleDouble
+.LSOverride
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
-/coverage/
-
-# Symbolication related
-app.*.symbols
-
-# Obfuscation related
-app.*.map.json
-
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# ---------------------------------------------------------
+# Temporary & Log files
+# ---------------------------------------------------------
+*.log
+*.tmp
+*.bak
+*.swp
+*.class
+*~

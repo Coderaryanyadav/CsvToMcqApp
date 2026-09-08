@@ -20,8 +20,9 @@ class StreakInfo {
   bool get isDailyGoalMet => todayQuestionsCompleted >= dailyGoal;
   bool get goalCompleted => isDailyGoalMet;
 
-  double get goalProgress =>
-      dailyGoal > 0 ? (todayQuestionsCompleted / dailyGoal).clamp(0.0, 1.0) : 0.0;
+  double get goalProgress => dailyGoal > 0
+      ? (todayQuestionsCompleted / dailyGoal).clamp(0.0, 1.0)
+      : 0.0;
 }
 
 class StreakService {
@@ -47,7 +48,8 @@ class StreakService {
     final Map<String, int> dailyQuestionCounts = {};
     for (final p in performances) {
       final key = _toDateKey(p.date);
-      dailyQuestionCounts[key] = (dailyQuestionCounts[key] ?? 0) + p.totalQuestions;
+      dailyQuestionCounts[key] =
+          (dailyQuestionCounts[key] ?? 0) + p.totalQuestions;
     }
 
     final int todayQuestions = dailyQuestionCounts[todayStr] ?? 0;
@@ -55,14 +57,16 @@ class StreakService {
 
     // Calculate current consecutive days
     int currentStreak = 0;
-    DateTime checkDate = studiedToday ? now : now.subtract(const Duration(days: 1));
+    DateTime checkDate =
+        studiedToday ? now : now.subtract(const Duration(days: 1));
 
     if (!studiedToday && !dailyQuestionCounts.containsKey(yesterdayStr)) {
       currentStreak = 0;
     } else {
       while (true) {
         final key = _toDateKey(checkDate);
-        if (dailyQuestionCounts.containsKey(key) && dailyQuestionCounts[key]! > 0) {
+        if (dailyQuestionCounts.containsKey(key) &&
+            dailyQuestionCounts[key]! > 0) {
           currentStreak++;
           checkDate = checkDate.subtract(const Duration(days: 1));
         } else {
@@ -116,4 +120,3 @@ class StreakService {
     return '$y-$m-$d';
   }
 }
-

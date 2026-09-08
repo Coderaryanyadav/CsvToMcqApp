@@ -175,8 +175,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Delete Exam'), findsNWidgets(2)); // Title & Button
-    expect(
-        find.text('Are you sure you want to delete this exam?'), findsOneWidget);
+    expect(find.text('Are you sure you want to delete this exam?'),
+        findsOneWidget);
 
     // Tap Delete Exam
     await tester.tap(find.widgetWithText(ElevatedButton, 'Delete Exam'));

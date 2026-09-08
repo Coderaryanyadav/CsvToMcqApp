@@ -59,11 +59,22 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
 
   Future<void> _loadBookmarks() async {
     final activeStudent = await StorageService.getActiveStudent();
-    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    final ids =
+        await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
     if (mounted) {
       setState(() {
         _bookmarkedIds = ids;
       });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      _saveSession();
     }
   }
 
@@ -99,57 +110,105 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     if (widget.examId != null) {
       final session = await StorageService.readSession(widget.examId!);
       if (session != null && mounted) {
-        final resume = await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            title: const Text('Resume Previous Session?'),
-            content: const Text(
-              'A saved session was found for this exam. Do you want to resume where you left off?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx, false),
-                child: const Text('Start Fresh'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(ctx, true),
-                child: const Text('Resume Session'),
-              ),
-            ],
-          ),
-        );
+        // Robust Session Validation
+        bool isSessionValid = true;
+        final validQMap = {for (var q in widget.questions) q.id: q};
 
-        if (resume == true && mounted) {
-          try {
-            final savedAnswers =
-                (session['answers'] as Map<String, dynamic>?)?.map(
-              (k, v) {
-                if (v is List) {
-                  return MapEntry(k, v.map((e) => (e as num).toInt()).toSet());
-                } else if (v is int) {
-                  return MapEntry(k, {v});
+        // 1. Validate exam ID
+        if (session['examId'] != null && session['examId'] != widget.examId) {
+          isSessionValid = false;
+        }
+
+        // 2. Validate current index
+        final savedIndex = session['currentIndex'];
+        if (savedIndex is! int ||
+            savedIndex < 0 ||
+            savedIndex >= widget.questions.length) {
+          isSessionValid = false;
+        }
+
+        // 3. Validate answers and option bounds
+        Map<String, Set<int>>? parsedAnswers;
+        if (isSessionValid && session['answers'] is Map) {
+          final rawAns = session['answers'] as Map;
+          parsedAnswers = {};
+          for (final entry in rawAns.entries) {
+            final qId = entry.key.toString();
+            final q = validQMap[qId];
+            if (q == null) {
+              isSessionValid = false;
+              break;
+            }
+            final v = entry.value;
+            final Set<int> sel = {};
+            if (v is List) {
+              for (final idx in v) {
+                if (idx is num && idx >= 0 && idx < q.options.length) {
+                  sel.add(idx.toInt());
+                } else {
+                  isSessionValid = false;
+                  break;
                 }
-                return MapEntry(k, <int>{});
-              },
+              }
+            } else if (v is int && v >= 0 && v < q.options.length) {
+              sel.add(v);
+            }
+            if (!isSessionValid) break;
+            parsedAnswers[qId] = sel;
+          }
+        }
+
+        if (!isSessionValid) {
+          await StorageService.clearSession(widget.examId!);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                    'Previous session was incompatible with the current question bank and was discarded.'),
+                backgroundColor: AppTheme.warning,
+              ),
             );
+          }
+        } else {
+          final resume = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Resume Previous Session?'),
+              content: const Text(
+                'A saved session was found for this exam. Do you want to resume where you left off?',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Start Fresh'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Resume Session'),
+                ),
+              ],
+            ),
+          );
+
+          if (resume == true && mounted) {
             final savedMarked = (session['marked'] as List?)?.cast<String>();
-            final savedIndex = session['currentIndex'] as int?;
             final savedRem = session['remainingSeconds'] as int?;
             final savedElapsed = session['elapsedSeconds'] as int?;
 
             setState(() {
-              if (savedAnswers != null) {
-                for (var entry in savedAnswers.entries) {
+              if (parsedAnswers != null) {
+                for (var entry in parsedAnswers.entries) {
                   if (answers.containsKey(entry.key)) {
                     answers[entry.key] = entry.value;
                   }
                 }
               }
               if (savedMarked != null) {
-                marked.addAll(savedMarked);
+                marked.addAll(
+                    savedMarked.where((id) => validQMap.containsKey(id)));
               }
               if (savedIndex != null && savedIndex < widget.questions.length) {
-                current = savedIndex;
+                current = savedIndex as int;
               }
               if (savedRem != null && savedRem > 0) {
                 _remainingSeconds = savedRem;
@@ -158,7 +217,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                 _elapsedSeconds = savedElapsed;
               }
             });
-          } catch (_) {}
+          }
         }
       }
     }
@@ -277,16 +336,26 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
     final Map<String, bool> results = {};
     final Map<String, int> topicTotals = {};
     final Map<String, int> topicCorrect = {};
+    final Map<String, Map<String, dynamic>> snapshots = {};
 
     for (var q in widget.questions) {
       final userSelection = answers[q.id] ?? <int>{};
       final topic = q.topic ?? 'General';
       topicTotals[topic] = (topicTotals[topic] ?? 0) + 1;
 
+      final isCorr = q.isAnswerCorrect(userSelection);
+      snapshots[q.id] = {
+        'question': q.question,
+        'topic': topic,
+        'difficulty': q.difficulty,
+        'userSelection': userSelection.toList(),
+        'isCorrect': isCorr,
+      };
+
       if (userSelection.isEmpty) {
         unanswered++;
         results[q.id] = false;
-      } else if (q.isAnswerCorrect(userSelection)) {
+      } else if (isCorr) {
         correct++;
         results[q.id] = true;
         topicCorrect[topic] = (topicCorrect[topic] ?? 0) + 1;
@@ -319,6 +388,7 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       questionResults: results,
       weakTopics: weak,
       passingPercentage: widget.passingPercentage,
+      questionSnapshots: snapshots,
     );
 
     await StorageService.savePerformance(perf);
@@ -406,7 +476,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
   Future<void> _toggleBookmark() async {
     final qId = widget.questions[current].id;
     final activeStudent = await StorageService.getActiveStudent();
-    final isStarred = await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
+    final isStarred =
+        await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
 
     setState(() {
       if (marked.contains(qId)) {
@@ -479,7 +550,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   child: Row(
                     children: [
                       Column(
@@ -487,12 +559,14 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                         children: [
                           const Text(
                             'Question Navigator',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold, fontSize: 17),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             '$answeredCount of $totalCount answered',
-                            style: const TextStyle(fontSize: 13, color: AppTheme.secondaryText),
+                            style: const TextStyle(
+                                fontSize: 13, color: AppTheme.secondaryText),
                           ),
                         ],
                       ),
@@ -509,7 +583,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                   child: GridView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 5,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
@@ -522,12 +597,15 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                       final isCurr = idx == current;
                       final isMark = marked.contains(itemQ.id);
 
-                      Color bg = isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
+                      Color bg = isDark
+                          ? const Color(0xFF0F172A)
+                          : const Color(0xFFF1F5F9);
                       Color textC = isDark ? Colors.white : AppTheme.text;
                       BorderSide borderSide = BorderSide.none;
 
                       if (isCurr) {
-                        borderSide = const BorderSide(color: AppTheme.accentBlue, width: 2);
+                        borderSide = const BorderSide(
+                            color: AppTheme.accentBlue, width: 2);
                       }
 
                       if (isAns) {
@@ -556,7 +634,9 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                               Text(
                                 '${idx + 1}',
                                 style: TextStyle(
-                                  fontWeight: isCurr ? FontWeight.bold : FontWeight.w600,
+                                  fontWeight: isCurr
+                                      ? FontWeight.bold
+                                      : FontWeight.w600,
                                   color: textC,
                                   fontSize: 14,
                                 ),
@@ -565,7 +645,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                 const Positioned(
                                   top: 3,
                                   right: 3,
-                                  child: Icon(Icons.bookmark, size: 12, color: AppTheme.warning),
+                                  child: Icon(Icons.bookmark,
+                                      size: 12, color: AppTheme.warning),
                                 ),
                             ],
                           ),
@@ -728,7 +809,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                   vertical: isMobile ? 4 : 6,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.primaryNavy.withValues(alpha: 0.08),
+                                  color: AppTheme.primaryNavy
+                                      .withValues(alpha: 0.08),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
@@ -745,7 +827,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                   child: Chip(
                                     label: Text(
                                       q.topic!,
-                                      style: TextStyle(fontSize: isMobile ? 11 : 12),
+                                      style: TextStyle(
+                                          fontSize: isMobile ? 11 : 12),
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                     visualDensity: VisualDensity.compact,
@@ -845,7 +928,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                                   padding: EdgeInsets.all(isMobile ? 12 : 16),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? AppTheme.accentBlue.withValues(alpha: 0.08)
+                                        ? AppTheme.accentBlue
+                                            .withValues(alpha: 0.08)
                                         : (isDark
                                             ? AppTheme.darkSurface
                                             : Colors.white),
@@ -915,7 +999,8 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               OutlinedButton.icon(
-                                icon: Icon(Icons.arrow_back, size: isMobile ? 16 : 18),
+                                icon: Icon(Icons.arrow_back,
+                                    size: isMobile ? 16 : 18),
                                 label: Text(isMobile ? 'Prev' : 'Previous'),
                                 onPressed: current > 0
                                     ? () => _navigateToQuestion(current - 1)
@@ -923,8 +1008,10 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
                               ),
                               if (current < totalCount - 1)
                                 FilledButton.icon(
-                                  icon: Icon(Icons.arrow_forward, size: isMobile ? 16 : 18),
-                                  label: Text(isMobile ? 'Next' : 'Next Question'),
+                                  icon: Icon(Icons.arrow_forward,
+                                      size: isMobile ? 16 : 18),
+                                  label:
+                                      Text(isMobile ? 'Next' : 'Next Question'),
                                   onPressed: () =>
                                       _navigateToQuestion(current + 1),
                                 )

@@ -52,6 +52,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       settings[key] = value;
     });
+    if (key == 'themeMode') {
+      AppTheme.setThemeMode(value.toString());
+    }
     await StorageService.saveSettings(settings);
   }
 
@@ -97,7 +100,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Row(
           children: [
-            Icon(Icons.restore_page_outlined, color: AppTheme.accentBlue, size: 24),
+            Icon(Icons.restore_page_outlined,
+                color: AppTheme.accentBlue, size: 24),
             SizedBox(width: 8),
             Text('Restore From Backup'),
           ],
@@ -130,7 +134,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Row(
             children: [
               Icon(Icons.check_circle, color: AppTheme.success, size: 24),
@@ -148,8 +153,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               _buildRestoreStat('Student Profiles', result.studentsRestored),
               _buildRestoreStat('Exam Question Banks', result.examsRestored),
-              _buildRestoreStat('Practice Performances', result.performancesRestored),
-              _buildRestoreStat('Bookmarked Questions', result.bookmarksRestored),
+              _buildRestoreStat(
+                  'Practice Performances', result.performancesRestored),
+              _buildRestoreStat(
+                  'Bookmarked Questions', result.bookmarksRestored),
             ],
           ),
           actions: [
@@ -176,8 +183,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
-          Text('$count', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          Text(label,
+              style:
+                  const TextStyle(color: AppTheme.secondaryText, fontSize: 13)),
+          Text('$count',
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         ],
       ),
     );
@@ -275,7 +286,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 0. STUDENT PROFILE SECTION
-                _sectionHeader('Student Profile & Multi-User', Icons.person_outline),
+                _sectionHeader(
+                    'Student Profile & Multi-User', Icons.person_outline),
                 Card(
                   child: ListTile(
                     leading: Container(
@@ -297,7 +309,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     title: Text(
                       activeStudent?.name ?? 'No Student Selected',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     subtitle: const Text(
                       'Switch or create student profiles with separate statistics and history.',
@@ -308,7 +321,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const WelcomeScreen(isSwitching: true),
+                            builder: (_) =>
+                                const WelcomeScreen(isSwitching: true),
                           ),
                         );
                         _loadSettings();
@@ -320,10 +334,51 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // 1. APPEARANCE SECTION
-                _sectionHeader('Appearance', Icons.palette_outlined),
+                _sectionHeader('Appearance & Theme', Icons.palette_outlined),
                 Card(
                   child: Column(
                     children: [
+                      ListTile(
+                        leading: const Icon(Icons.brightness_6_outlined),
+                        title: const Text('Theme Mode',
+                            style: TextStyle(fontWeight: FontWeight.w600)),
+                        subtitle: Text(
+                          settings['themeMode'] == 'dark'
+                              ? 'Dark theme'
+                              : settings['themeMode'] == 'light'
+                                  ? 'Light theme'
+                                  : 'System theme (follow device settings)',
+                        ),
+                        trailing: SegmentedButton<String>(
+                          segments: const [
+                            ButtonSegment(
+                              value: 'system',
+                              label: Text('System'),
+                              icon: Icon(Icons.brightness_auto, size: 16),
+                            ),
+                            ButtonSegment(
+                              value: 'light',
+                              label: Text('Light'),
+                              icon: Icon(Icons.light_mode, size: 16),
+                            ),
+                            ButtonSegment(
+                              value: 'dark',
+                              label: Text('Dark'),
+                              icon: Icon(Icons.dark_mode, size: 16),
+                            ),
+                          ],
+                          selected: {
+                            (settings['themeMode']?.toString().toLowerCase() ??
+                                'system')
+                          },
+                          onSelectionChanged: (newSelection) {
+                            if (newSelection.isNotEmpty) {
+                              _updateSetting('themeMode', newSelection.first);
+                            }
+                          },
+                        ),
+                      ),
+                      const Divider(height: 1),
                       ListTile(
                         leading: const Icon(Icons.format_size),
                         title: const Text('Question Font Size',
@@ -352,28 +407,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // 2. EXAM DEFAULTS & DAILY GOAL SECTION
-                _sectionHeader('Exam & Study Habit Targets', Icons.tune_outlined),
+                _sectionHeader(
+                    'Exam & Study Habit Targets', Icons.tune_outlined),
                 Card(
                   child: Column(
                     children: [
                       ListTile(
-                        leading: const Icon(Icons.local_fire_department_outlined,
+                        leading: const Icon(
+                            Icons.local_fire_department_outlined,
                             color: Color(0xFFEA580C)),
                         title: const Text('Daily Study Question Goal',
                             style: TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text(
                             'Target number of questions to answer each day for streak tracking'),
                         trailing: DropdownButton<int>(
-                          value:
-                              (settings['dailyGoal'] as num?)?.toInt() ?? 20,
+                          value: (settings['dailyGoal'] as num?)?.toInt() ?? 20,
                           underline: const SizedBox(),
                           items: const [
-                            DropdownMenuItem(value: 5, child: Text('5 Questions')),
-                            DropdownMenuItem(value: 10, child: Text('10 Questions')),
-                            DropdownMenuItem(value: 15, child: Text('15 Questions')),
-                            DropdownMenuItem(value: 20, child: Text('20 Questions')),
-                            DropdownMenuItem(value: 30, child: Text('30 Questions')),
-                            DropdownMenuItem(value: 50, child: Text('50 Questions')),
+                            DropdownMenuItem(
+                                value: 5, child: Text('5 Questions')),
+                            DropdownMenuItem(
+                                value: 10, child: Text('10 Questions')),
+                            DropdownMenuItem(
+                                value: 15, child: Text('15 Questions')),
+                            DropdownMenuItem(
+                                value: 20, child: Text('20 Questions')),
+                            DropdownMenuItem(
+                                value: 30, child: Text('30 Questions')),
+                            DropdownMenuItem(
+                                value: 50, child: Text('50 Questions')),
                           ],
                           onChanged: (v) {
                             if (v != null) _updateSetting('dailyGoal', v);
@@ -440,21 +502,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // 3. DESKTOP KEYBOARD SHORTCUTS SECTION
-                _sectionHeader('Desktop Keyboard Shortcuts', Icons.keyboard_outlined),
+                _sectionHeader(
+                    'Desktop Keyboard Shortcuts', Icons.keyboard_outlined),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        _buildShortcutRow('1, 2, 3, 4  or  A, B, C, D', 'Select Option (A, B, C, D)'),
+                        _buildShortcutRow('1, 2, 3, 4  or  A, B, C, D',
+                            'Select Option (A, B, C, D)'),
                         const Divider(height: 14),
-                        _buildShortcutRow('Left Arrow / Right Arrow', 'Navigate to Previous / Next Question'),
+                        _buildShortcutRow('Left Arrow / Right Arrow',
+                            'Navigate to Previous / Next Question'),
                         const Divider(height: 14),
-                        _buildShortcutRow('Spacebar', 'Toggle Explanation (Practice) / Flag for Review (Exam)'),
+                        _buildShortcutRow('Spacebar',
+                            'Toggle Explanation (Practice) / Flag for Review (Exam)'),
                         const Divider(height: 14),
-                        _buildShortcutRow('M Key', 'Star / Bookmark Question for Revision'),
+                        _buildShortcutRow(
+                            'M Key', 'Star / Bookmark Question for Revision'),
                         const Divider(height: 14),
-                        _buildShortcutRow('Enter', 'Advance to Next Question / Finish Session'),
+                        _buildShortcutRow('Enter',
+                            'Advance to Next Question / Finish Session'),
                       ],
                     ),
                   ),
@@ -556,7 +624,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 24),
 
-
                 // 5. ABOUT SECTION
                 _sectionHeader('About', Icons.info_outline),
                 const Card(
@@ -655,4 +722,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-

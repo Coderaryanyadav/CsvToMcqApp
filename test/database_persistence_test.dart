@@ -27,7 +27,8 @@ void main() {
   late Directory tempTestDir;
 
   setUp(() async {
-    tempTestDir = await Directory.systemTemp.createTemp('mcq_db_persistence_test_');
+    tempTestDir =
+        await Directory.systemTemp.createTemp('mcq_db_persistence_test_');
   });
 
   tearDown(() async {
@@ -37,7 +38,9 @@ void main() {
   });
 
   group('Database & Cold Restart Persistence Tests', () {
-    test('Simulate App Session 1 -> Save Data -> App Close -> App Session 2 Cold Restart -> Verify Full Data Integrity', () async {
+    test(
+        'Simulate App Session 1 -> Save Data -> App Close -> App Session 2 Cold Restart -> Verify Full Data Integrity',
+        () async {
       // ==========================================
       // SESSION 1: User opens app for the 1st time
       // ==========================================
@@ -94,17 +97,15 @@ void main() {
             displayNumber: 2,
             questionType: 'multiple',
             question: 'Which services provide serverless compute? (Choose two)',
-            options: [
-              'AWS Lambda',
-              'Amazon EC2',
-              'AWS Fargate',
-              'Amazon EBS'
-            ],
+            options: ['AWS Lambda', 'Amazon EC2', 'AWS Fargate', 'Amazon EBS'],
             correctAnswers: {0, 2},
             difficulty: 3,
             topic: 'Compute',
             tags: ['AWS', 'Serverless'],
-            optionExplanations: {0: 'Lambda is serverless.', 2: 'Fargate runs serverless containers.'},
+            optionExplanations: {
+              0: 'Lambda is serverless.',
+              2: 'Fargate runs serverless containers.'
+            },
           ),
         ],
       );
@@ -155,8 +156,14 @@ void main() {
       // 1. Verify students
       final loadedStudents = await StorageService.getAllStudents();
       expect(loadedStudents.length, equals(2));
-      expect(loadedStudents.any((s) => s.name == 'Alice Johnson' && s.avatarEmoji == '👩‍💻'), isTrue);
-      expect(loadedStudents.any((s) => s.name == 'Bob Smith' && s.avatarEmoji == '👨‍🎓'), isTrue);
+      expect(
+          loadedStudents.any(
+              (s) => s.name == 'Alice Johnson' && s.avatarEmoji == '👩‍💻'),
+          isTrue);
+      expect(
+          loadedStudents
+              .any((s) => s.name == 'Bob Smith' && s.avatarEmoji == '👨‍🎓'),
+          isTrue);
 
       final activeStudent = await StorageService.getActiveStudent();
       expect(activeStudent, isNotNull);
@@ -172,7 +179,8 @@ void main() {
       expect(loadedExam.defaultDuration, equals(45));
       expect(loadedExam.passingPercentage, equals(80));
       expect(loadedExam.questions.length, equals(2));
-      expect(loadedExam.questions[0].question, equals('What is Amazon S3 primarily used for?'));
+      expect(loadedExam.questions[0].question,
+          equals('What is Amazon S3 primarily used for?'));
       expect(loadedExam.questions[0].correctAnswers, equals({0}));
       expect(loadedExam.questions[1].isMultiple, isTrue);
       expect(loadedExam.questions[1].correctAnswers, equals({0, 2}));
@@ -199,7 +207,9 @@ void main() {
       expect(loadedSettings['activeStudentId'], equals('student-alice-1'));
     });
 
-    test('Data modifications, deletions, and profile switching persist across consecutive app restarts', () async {
+    test(
+        'Data modifications, deletions, and profile switching persist across consecutive app restarts',
+        () async {
       // Session 1: Create multiple exams & students
       final repo1 = TestStorageRepository(tempTestDir);
       StorageService.setRepository(repo1);
@@ -239,7 +249,9 @@ void main() {
       expect(active?.name, equals('User 1'));
     });
 
-    test('Isolated student performance history persists accurately across restarts', () async {
+    test(
+        'Isolated student performance history persists accurately across restarts',
+        () async {
       final repo1 = TestStorageRepository(tempTestDir);
       StorageService.setRepository(repo1);
       await StorageService.init();
@@ -288,7 +300,9 @@ void main() {
       expect(s2Perfs.first.correct, equals(5));
     });
 
-    test('Completely deleting an exam purges exam, active session, and performance history', () async {
+    test(
+        'Completely deleting an exam purges exam, active session, and performance history',
+        () async {
       final repo1 = TestStorageRepository(tempTestDir);
       StorageService.setRepository(repo1);
       await StorageService.init();
@@ -298,7 +312,11 @@ void main() {
       await StorageService.setActiveStudent(student);
 
       final exam = Exam(id: 'exam-to-purge', name: 'Exam to Purge', questions: [
-        Question(id: 'q1', question: 'Q1', options: ['A', 'B', 'C', 'D'], correct: 0),
+        Question(
+            id: 'q1',
+            question: 'Q1',
+            options: ['A', 'B', 'C', 'D'],
+            correct: 0),
       ]);
       await StorageService.saveExam(exam);
 
@@ -312,9 +330,15 @@ void main() {
         totalQuestions: 1,
       ));
 
-      expect((await StorageService.loadAllExams()).any((e) => e.id == 'exam-to-purge'), isTrue);
+      expect(
+          (await StorageService.loadAllExams())
+              .any((e) => e.id == 'exam-to-purge'),
+          isTrue);
       expect(await StorageService.readSession('exam-to-purge'), isNotNull);
-      expect((await StorageService.loadAllPerformancesAsync()).any((p) => p.examId == 'exam-to-purge'), isTrue);
+      expect(
+          (await StorageService.loadAllPerformancesAsync())
+              .any((p) => p.examId == 'exam-to-purge'),
+          isTrue);
 
       // Perform complete deletion & purge
       await StorageService.deleteExam('exam-to-purge');
@@ -325,9 +349,15 @@ void main() {
       StorageService.setRepository(repo2);
       await StorageService.init();
 
-      expect((await StorageService.loadAllExams()).any((e) => e.id == 'exam-to-purge'), isFalse);
+      expect(
+          (await StorageService.loadAllExams())
+              .any((e) => e.id == 'exam-to-purge'),
+          isFalse);
       expect(await StorageService.readSession('exam-to-purge'), isNull);
-      expect((await StorageService.loadAllPerformancesAsync()).any((p) => p.examId == 'exam-to-purge'), isFalse);
+      expect(
+          (await StorageService.loadAllPerformancesAsync())
+              .any((p) => p.examId == 'exam-to-purge'),
+          isFalse);
     });
   });
 }

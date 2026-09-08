@@ -54,7 +54,8 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
 
   Future<void> _loadBookmarks() async {
     final activeStudent = await StorageService.getActiveStudent();
-    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    final ids =
+        await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
     if (mounted) {
       setState(() {
         _bookmarkedIds = ids;
@@ -134,7 +135,8 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
     if (current >= widget.questions.length) return;
     final qId = widget.questions[current].id;
     final activeStudent = await StorageService.getActiveStudent();
-    final isStarred = await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
+    final isStarred =
+        await StorageService.toggleBookmark(qId, studentId: activeStudent?.id);
 
     setState(() {
       if (isStarred) {
@@ -574,7 +576,8 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 800),
@@ -624,7 +627,8 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                                             horizontal: 8, vertical: 4),
                                         decoration: BoxDecoration(
                                           color: const Color(0xFFF3F4F6),
-                                          borderRadius: BorderRadius.circular(6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           q.topic!,
@@ -663,225 +667,296 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                                     ),
                                   ],
                                 ),
-                              if (isMultiple) ...[
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Select all that apply.',
-                                  style: TextStyle(
-                                    fontStyle: FontStyle.italic,
-                                    color: AppTheme.accentBlue,
-                                    fontSize: 13,
+                                if (isMultiple) ...[
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Select all that apply.',
+                                    style: TextStyle(
+                                      fontStyle: FontStyle.italic,
+                                      color: AppTheme.accentBlue,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                Text(
+                                  '${q.displayId}. ${q.question}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
                                     fontWeight: FontWeight.w600,
+                                    color: AppTheme.text,
+                                    height: 1.45,
                                   ),
                                 ),
                               ],
-                              const SizedBox(height: 16),
-                              Text(
-                                '${q.displayId}. ${q.question}',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.text,
-                                  height: 1.45,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      ...List.generate(q.options.length, (i) {
-                        final isOptionSelected = selected.contains(i);
-                        final isOptionCorrect = q.correctAnswers.contains(i);
-                        final exp = q.getExplanation(i);
+                        const SizedBox(height: 16),
+                        ...List.generate(q.options.length, (i) {
+                          final isOptionSelected = selected.contains(i);
+                          final isOptionCorrect = q.correctAnswers.contains(i);
+                          final exp = q.getExplanation(i);
 
-                        Color cardBg = Colors.white;
-                        Color borderColor = AppTheme.border;
-                        Widget? statusIcon;
+                          Color cardBg = Colors.white;
+                          Color borderColor = AppTheme.border;
+                          Widget? statusIcon;
 
-                        if (isRevealed) {
-                          if (isOptionCorrect) {
-                            cardBg = const Color(0xFFF0FDF4);
-                            borderColor = const Color(0xFF86EFAC);
-                            statusIcon = const Icon(Icons.check_circle,
-                                color: AppTheme.success, size: 20);
-                          } else if (isOptionSelected && !isOptionCorrect) {
-                            cardBg = const Color(0xFFFEF2F2);
-                            borderColor = const Color(0xFFFCA5A5);
-                            statusIcon = const Icon(Icons.cancel,
-                                color: AppTheme.danger, size: 20);
-                          } else {
-                            cardBg = const Color(0xFFF9FAFB);
-                            borderColor = const Color(0xFFE5E7EB);
-                            statusIcon = const Icon(Icons.remove_circle_outline,
-                                color: Color(0xFF9CA3AF), size: 20);
+                          if (isRevealed) {
+                            if (isOptionCorrect) {
+                              cardBg = const Color(0xFFF0FDF4);
+                              borderColor = const Color(0xFF86EFAC);
+                              statusIcon = const Icon(Icons.check_circle,
+                                  color: AppTheme.success, size: 20);
+                            } else if (isOptionSelected && !isOptionCorrect) {
+                              cardBg = const Color(0xFFFEF2F2);
+                              borderColor = const Color(0xFFFCA5A5);
+                              statusIcon = const Icon(Icons.cancel,
+                                  color: AppTheme.danger, size: 20);
+                            } else {
+                              cardBg = const Color(0xFFF9FAFB);
+                              borderColor = const Color(0xFFE5E7EB);
+                              statusIcon = const Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Color(0xFF9CA3AF),
+                                  size: 20);
+                            }
+                          } else if (isOptionSelected) {
+                            cardBg = const Color(0xFFEBF2FA);
+                            borderColor = AppTheme.accentBlue;
                           }
-                        } else if (isOptionSelected) {
-                          cardBg = const Color(0xFFEBF2FA);
-                          borderColor = AppTheme.accentBlue;
-                        }
 
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: isRevealed
-                                  ? null
-                                  : () => _toggleOption(i, isMultiple),
-                              borderRadius: BorderRadius.circular(12),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: cardBg,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: borderColor,
-                                    width: isOptionSelected ||
-                                            (isRevealed && isOptionCorrect)
-                                        ? 2
-                                        : 1,
-                                  ),
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        if (!isRevealed) ...[
-                                          if (isMultiple)
-                                            Icon(
-                                              isOptionSelected
-                                                  ? Icons.check_box
-                                                  : Icons
-                                                      .check_box_outline_blank,
-                                              color: isOptionSelected
-                                                  ? AppTheme.accentBlue
-                                                  : AppTheme.secondaryText,
-                                              size: 22,
-                                            )
-                                          else
-                                            Icon(
-                                              isOptionSelected
-                                                  ? Icons.radio_button_checked
-                                                  : Icons
-                                                      .radio_button_unchecked,
-                                              color: isOptionSelected
-                                                  ? AppTheme.accentBlue
-                                                  : AppTheme.secondaryText,
-                                              size: 22,
-                                            ),
-                                          const SizedBox(width: 12),
-                                        ] else if (statusIcon != null) ...[
-                                          statusIcon,
-                                          const SizedBox(width: 12),
-                                        ],
-                                        Text(
-                                          '${String.fromCharCode(65 + i)} — ',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 15,
-                                            color: isOptionSelected
-                                                ? AppTheme.accentBlue
-                                                : AppTheme.text,
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            q.options[i],
-                                            style: TextStyle(
-                                              fontSize: 15,
-                                              fontWeight: isOptionSelected
-                                                  ? FontWeight.w600
-                                                  : FontWeight.normal,
-                                              color: AppTheme.text,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: isRevealed
+                                    ? null
+                                    : () => _toggleOption(i, isMultiple),
+                                borderRadius: BorderRadius.circular(12),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                    color: cardBg,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: borderColor,
+                                      width: isOptionSelected ||
+                                              (isRevealed && isOptionCorrect)
+                                          ? 2
+                                          : 1,
                                     ),
-                                    if (isRevealed) ...[
-                                      const SizedBox(height: 10),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: isOptionCorrect
-                                              ? const Color(0xFFDCFCE7)
-                                              : const Color(0xFFFEE2E2),
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        child: Row(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              isOptionCorrect
-                                                  ? '✅ Correct: '
-                                                  : '❌ Incorrect: ',
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          if (!isRevealed) ...[
+                                            if (isMultiple)
+                                              Icon(
+                                                isOptionSelected
+                                                    ? Icons.check_box
+                                                    : Icons
+                                                        .check_box_outline_blank,
+                                                color: isOptionSelected
+                                                    ? AppTheme.accentBlue
+                                                    : AppTheme.secondaryText,
+                                                size: 22,
+                                              )
+                                            else
+                                              Icon(
+                                                isOptionSelected
+                                                    ? Icons.radio_button_checked
+                                                    : Icons
+                                                        .radio_button_unchecked,
+                                                color: isOptionSelected
+                                                    ? AppTheme.accentBlue
+                                                    : AppTheme.secondaryText,
+                                                size: 22,
+                                              ),
+                                            const SizedBox(width: 12),
+                                          ] else if (statusIcon != null) ...[
+                                            statusIcon,
+                                            const SizedBox(width: 12),
+                                          ],
+                                          Text(
+                                            '${String.fromCharCode(65 + i)} — ',
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 15,
+                                              color: isOptionSelected
+                                                  ? AppTheme.accentBlue
+                                                  : AppTheme.text,
+                                            ),
+                                          ),
+                                          Expanded(
+                                            child: Text(
+                                              q.options[i],
                                               style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
-                                                color: isOptionCorrect
-                                                    ? const Color(0xFF14532D)
-                                                    : const Color(0xFF7F1D1D),
+                                                fontSize: 15,
+                                                fontWeight: isOptionSelected
+                                                    ? FontWeight.w600
+                                                    : FontWeight.normal,
+                                                color: AppTheme.text,
                                               ),
                                             ),
-                                            Expanded(
-                                              child: Text(
-                                                exp != null && exp.isNotEmpty
-                                                    ? exp
-                                                    : (isOptionCorrect
-                                                        ? 'This is a correct answer for this question.'
-                                                        : 'This option is incorrect.'),
+                                          ),
+                                        ],
+                                      ),
+                                      if (isRevealed) ...[
+                                        const SizedBox(height: 10),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 12, vertical: 8),
+                                          decoration: BoxDecoration(
+                                            color: isOptionCorrect
+                                                ? const Color(0xFFDCFCE7)
+                                                : const Color(0xFFFEE2E2),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                isOptionCorrect
+                                                    ? '✅ Correct: '
+                                                    : '❌ Incorrect: ',
                                                 style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
                                                   fontSize: 12,
                                                   color: isOptionCorrect
                                                       ? const Color(0xFF14532D)
                                                       : const Color(0xFF7F1D1D),
                                                 ),
                                               ),
-                                            ),
-                                          ],
+                                              Expanded(
+                                                child: Text(
+                                                  exp != null && exp.isNotEmpty
+                                                      ? exp
+                                                      : (isOptionCorrect
+                                                          ? 'This is a correct answer for this question.'
+                                                          : 'This option is incorrect.'),
+                                                  style: TextStyle(
+                                                    fontSize: 12,
+                                                    color: isOptionCorrect
+                                                        ? const Color(
+                                                            0xFF14532D)
+                                                        : const Color(
+                                                            0xFF7F1D1D),
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
                               ),
                             ),
+                          );
+                        }),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: const Color(0xFFEBF2FA),
+                              foregroundColor: AppTheme.primaryNavy,
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                            icon: Icon(
+                                isRevealed
+                                    ? Icons.visibility_off
+                                    : Icons.lightbulb_outline,
+                                size: 18),
+                            label: Text(
+                              isRevealed ? 'Hide Explanations' : 'Show Answer',
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _revealed[current] = !isRevealed;
+                              });
+                            },
                           ),
-                        );
-                      }),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: FilledButton.tonalIcon(
-                          style: FilledButton.styleFrom(
-                            backgroundColor: const Color(0xFFEBF2FA),
-                            foregroundColor: AppTheme.primaryNavy,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 14),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: AppTheme.border)),
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 800),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                           ),
-                          icon: Icon(
-                              isRevealed
-                                  ? Icons.visibility_off
-                                  : Icons.lightbulb_outline,
-                              size: 18),
-                          label: Text(
-                            isRevealed ? 'Hide Explanations' : 'Show Answer',
-                            style: const TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 14),
+                          icon: const Icon(Icons.arrow_back, size: 16),
+                          label: const Text('Previous'),
+                          onPressed: current > 0
+                              ? () => _navigateToQuestion(current - 1)
+                              : null,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10)),
+                        ),
+                        icon: const Icon(Icons.grid_view, size: 16),
+                        label: const Text('Grid'),
+                        onPressed: _showQuestionNavigatorModal,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: isLast
+                                ? AppTheme.accentBlue
+                                : AppTheme.primaryNavy,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
                           ),
+                          icon: Icon(isLast ? Icons.check : Icons.arrow_forward,
+                              size: 16),
+                          label: Text(isLast ? 'Finish' : 'Next'),
                           onPressed: () {
-                            setState(() {
-                              _revealed[current] = !isRevealed;
-                            });
+                            if (isLast) {
+                              _finishPractice();
+                            } else {
+                              _navigateToQuestion(current + 1);
+                            }
                           },
                         ),
                       ),
@@ -890,75 +965,9 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                 ),
               ),
             ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: AppTheme.border)),
-            ),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: const Icon(Icons.arrow_back, size: 16),
-                        label: const Text('Previous'),
-                        onPressed: current > 0
-                            ? () => _navigateToQuestion(current - 1)
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 12),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.grid_view, size: 16),
-                      label: const Text('Grid'),
-                      onPressed: _showQuestionNavigatorModal,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: isLast
-                              ? AppTheme.accentBlue
-                              : AppTheme.primaryNavy,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10)),
-                        ),
-                        icon: Icon(isLast ? Icons.check : Icons.arrow_forward,
-                            size: 16),
-                        label: Text(isLast ? 'Finish' : 'Next'),
-                        onPressed: () {
-                          if (isLast) {
-                            _finishPractice();
-                          } else {
-                            _navigateToQuestion(current + 1);
-                          }
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

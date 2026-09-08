@@ -7,7 +7,10 @@ import 'theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await StorageService.init();
-  await StorageService.loadSettings();
+  final settings = await StorageService.loadSettings();
+  final themeModeSetting = settings['themeMode']?.toString() ?? 'system';
+  AppTheme.setThemeMode(themeModeSetting);
+
   final activeStudent = await StorageService.getActiveStudent();
   runApp(MyApp(hasActiveStudent: activeStudent != null));
 }
@@ -19,13 +22,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'QuizPro - MCQ Exam Simulator',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme,
-      themeMode: ThemeMode.light,
-      home: hasActiveStudent ? const HomeScreen() : const WelcomeScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppTheme.themeModeNotifier,
+      builder: (context, currentMode, _) {
+        return MaterialApp(
+          title: 'QuizPro - MCQ Exam Simulator',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: currentMode,
+          home: hasActiveStudent ? const HomeScreen() : const WelcomeScreen(),
+        );
+      },
     );
   }
 }
-

@@ -1,115 +1,176 @@
 # 🎓 QuizPro — Modern MCQ & Examination Simulator
 
-A production-ready, cross-platform Flutter application for certification exams, standardized testing, and self-paced question banks (e.g. AWS, CIA, CISA, SQL, and custom curriculums).
+[![Flutter CI](https://github.com/Coderaryanyadav/CsvToMcqApp/actions/workflows/flutter.yml/badge.svg)](https://github.com/Coderaryanyadav/CsvToMcqApp/actions/workflows/flutter.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](README.md)
 
-Features a multi-student profile system, 100% dynamic database persistence with atomic cold-restart protection, CSV/Excel/JSON import with header alias normalization, timed and untimed exam simulation, instant-feedback practice modes, and comprehensive analytics.
+**QuizPro** is an offline-first, cross-platform Flutter application designed for certification exams, standardized test preparation, and custom question banks (e.g. AWS, CIA, CISA, SQL, and personalized curriculums).
+
+It combines a multi-student profile system, safe atomic local persistence, resilient CSV/Excel import, timed and untimed exam simulation, interactive practice mode with per-option explanations, and pure chronological analytics.
 
 ---
 
-## 🚀 Quick Start
+## 📸 Screenshots
 
-### Prerequisites
-* **Flutter SDK**: `^3.10.0` or higher
-* **Dart SDK**: `^3.0.0 <4.0.0`
-* **Xcode / CocoaPods** (for macOS & iOS)
-* **Android Studio / Android SDK** (for Android)
+| Dashboard & Overview | Question Import Preview | Exam Simulation Mode |
+|---|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Import Preview](docs/screenshots/import.png) | ![Exam Mode](docs/screenshots/exam.png) |
 
-### 1. Install Dependencies
+---
+
+## 🚀 Key Features
+
+* **👥 Multi-Student Profiles & Data Isolation**: Create separate student profiles with custom avatar emojis and colors. Statistics, attempt histories, bookmarks, and sessions are isolated per active student.
+* **📂 Flexible CSV & Excel (XLSX) Import**: Intelligent header alias normalization (`question_text`, `choice_1`–`4`, `correct_answer`, `explanation_a`–`d`, etc.) with duplicate detection and an interactive validation preview.
+* **⏱️ Exam Simulator**: Timed and untimed exams, question navigation grid, flag for review, auto-submit on timer expiration, and lifecycle auto-saving (`WidgetsBindingObserver`).
+* **📘 Interactive Practice Mode**: Instant answer validation, per-option explanations, and dedicated "Practice Mistakes" drilling.
+* **⭐ Question Bookmarking & Revision Filter**: Star challenging questions across exams and practice; filter question banks to drill bookmarked items.
+* **📈 Chronological Analytics & Snapshots**: Accurate learning curves calculated from oldest to newest attempts. Historical metadata snapshots ensure past test records remain reliable even if questions are edited or deleted later.
+* **💾 Safe Atomic File Persistence**: Safe write staging (`.tmp_${timestamp}` -> flush -> rename/replace) ensures zero file corruption during power loss or abrupt OS suspension.
+* **📦 Full Backup & Restore Packages**: Single-click JSON export/import of all student profiles, question banks, bookmarks, and past attempt history.
+* **🌓 Real Dark Mode & Semantic Design System**: Supports `System`, `Light`, and `Dark` (slate palette) modes with instant reactive switching.
+* **⌨️ Desktop Keyboard Shortcuts**: `1`-`4` or `A`-`D` for option selection, arrow keys for navigation, `Space`/`M` for review flags, and `Enter` to advance.
+
+---
+
+## 🌐 Supported Platforms
+
+| Platform | Support Tier | Notes |
+|---|---|---|
+| 🤖 **Android** | Production | Android 5.0+ (API 21+), ARM64 / ARMv7 / x86_64 release APKs |
+| 🍏 **macOS** | Production | macOS 10.14+, Native Desktop UI with Keyboard Shortcuts |
+| 📱 **iOS** | Production | iOS 12.0+, Simulator & Physical Device |
+| 🪟 **Windows** | Supported | Windows 10+ Desktop |
+| 🐧 **Linux** | Supported | Linux Desktop (GTK) |
+
+---
+
+## 📋 System Requirements
+
+* **Flutter SDK**: `>=3.10.0` (Dart SDK `>=3.0.0 <4.0.0`)
+* **Android Studio / Android SDK** (for Android builds)
+* **Xcode & CocoaPods** (for iOS / macOS builds)
+
+---
+
+## 🛠️ Installation & Setup
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Coderaryanyadav/CsvToMcqApp.git
+cd CsvToMcqApp
+```
+
+### 2. Install Dependencies
 ```bash
 flutter pub get
 ```
 
-### 2. Run the App
-| Target Platform | Command |
-|---|---|
-| 🤖 **Android Emulator / Device** | `flutter run -d android` |
-| 📱 **iOS Simulator / Device** | `flutter run -d ios` |
-| 🍏 **macOS Desktop** | `flutter run -d macos` |
-
-### 3. Static Analysis & Test Verification
+### 3. Run Locally
 ```bash
-# Verify static analysis (0 errors, 0 warnings, 0 infos)
-flutter analyze
+# Android
+flutter run -d android
 
-# Run full automated test suite (46 unit, widget & database persistence tests)
-flutter test
-```
+# macOS Desktop
+flutter run -d macos
 
-### 4. Build Release Packages
-```bash
-# Android APK
-flutter build apk --release
-
-# iOS Release Bundle
-flutter build ipa --release
-
-# macOS Application
-flutter build macos --release
+# iOS Simulator
+flutter run -d ios
 ```
 
 ---
 
-## ✨ Core Features & Architecture
+## 📥 Importing Questions
 
-### 1. 👥 Multi-Student Onboarding & Profile System
-- **Welcome Screen**: Onboarding flow allowing multiple students to create profiles with custom names, emoji avatars, and personalized theme accent colors.
-- **Fast Profile Switcher**: 1-tap modal sheet switcher accessible in the top navigation bar and Settings.
-- **Data Isolation**: History, exam performance records, scores, and active sessions are isolated per active student profile.
+QuizPro supports both **CSV** and **Excel (.xlsx)** spreadsheet imports.
 
-### 2. 💾 100% Dynamic Local Database & Cold-Restart Persistence
-- **Zero Mock / Hardcoded Data**: All exams, questions, and performance records are 100% user/import-driven.
-- **Atomic Disk Flushing**: All save operations execute with `flush: true` to prevent data loss on sudden app termination or device restart.
-- **In-Memory Cache with Write-Through Invalidation**: High-speed RAM caching gives instant $O(1)$/$O(N)$ lookups during navigation while syncing mutations immediately to disk.
-- **Collision-Resistant Logging**: Performance records utilize microsecond timestamps and student ID tagging to prevent record collisions during rapid testing.
-
-### 3. 📂 Resilient CSV, Excel (XLSX) & JSON Import Engine
-- **Normalized Header Alias Mapping**: Maps flexible headers regardless of casing or formatting (`question`, `question_text`, `prompt`, `option_a`–`option_d`, `choice_1`–`choice_4`, `correct_answer`, `key`, `explanation_a`–`explanation_d`, `topic`, `difficulty`, `tags`).
-- **Strict Answer Validation**: Supports letter keys (`A, B, C, D`), number keys (`1, 2, 3, 4`), multi-select (`A|C`, `1|3`), or literal option text.
-- **Duplicate & Error Detection**: Checks for empty prompts, intra-file duplicates, and option clashes prior to import.
-- **Import Preview Modal**: Full preview of valid items, duplicate warnings, and actionable error suggestions prior to committing changes.
-
-### 4. ⏱️ Responsive Exam Simulation Mode
-- **Adaptive Layouts**: Full-screen responsive layout tailored for mobile devices, automatically converting fixed sidebars into bottom-sheet question navigators on small screens.
-- **Timed & Untimed Sessions**: Choose preset durations (15m, 30m, 45m, 60m, custom) or untimed study.
-- **Timer Expiration Auto-Submit**: Automatically saves, grades, and displays the result breakdown when the countdown timer hits `0:00`.
-- **Question Availability Safety Guards**: Prevents starting an exam with more requested questions than exist in the bank.
-- **Single & Multi-Select Grading**: Exact set matching for multiple-choice questions.
-
-### 5. 📘 Interactive Practice Mode
-- Self-paced question walkthroughs with instant answer verification.
-- Revealing per-option explanations (A, B, C, D) and difficulty badges.
-- Session time tracking and automatic grading saved to student history upon completion.
-
-### 6. 📈 Chronological Analytics & History
-- **True Chronological Ordering**: Evaluates attempts from oldest to newest to compute genuine learning curves.
-- **Granular Breakdowns**: Topic-wise and difficulty-wise performance tracking.
-- **Zero Fabricated Scores**: Shows "No attempts yet" when no runs have occurred.
-
----
-
-## 📋 CSV / Excel Import Format Specification
-
+### CSV Format Specification
 ```csv
 Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation A,Explanation B,Explanation C,Explanation D,Topic,Difficulty,Tags
 "What is Docker?",Container runtime,Operating system,Web browser,Database,A,"Docker manages containers","Not an OS","Not a browser","Not a database",DevOps,2,"containers,virtualization"
 "Which are relational databases?",PostgreSQL,MongoDB,MySQL,Redis,A|C,"PostgreSQL is SQL","MongoDB is NoSQL","MySQL is SQL","Redis is Key-Value",Databases,3,"sql,rdbms"
 ```
 
+### Supported Header Aliases
+* **Question Prompt**: `question`, `question_text`, `prompt`, `q`
+* **Options**: `option_a`–`option_d`, `choice_1`–`choice_4`
+* **Correct Answer**: `correct_answer`, `correct`, `answer`, `key` (Supports `A`-`D`, `1`-`4`, multi-select `A|C`, or exact option text)
+* **Explanations**: `explanation`, `explanation_a`–`explanation_d`
+* **Metadata**: `topic`, `difficulty` (`1`–`5`), `tags`
+
 ---
 
-## 🧪 Test Suite Overview
+## 💾 Local Storage & Privacy
 
-| Test Suite | File | Description |
-|---|---|---|
-| **Database Persistence & Cold Restarts** | [`test/database_persistence_test.dart`](test/database_persistence_test.dart) | Multi-session cold restart simulation, data preservation, student isolation, atomic disk writes. |
-| **Student Profiles** | [`test/student_profile_test.dart`](test/student_profile_test.dart) | Profile model serialization, color/avatar preservation, student-performance mapping. |
-| **Analytics & Chronology** | [`test/analytics_test.dart`](test/analytics_test.dart) | Chronological score improvement, weak topic detection, empty state handling. |
-| **CSV & Excel Import** | [`test/import_test.dart`](test/import_test.dart) | Header alias normalization, multi-select delimiters, invalid key handling. |
-| **Model Serialization** | [`test/exam_session_test.dart`](test/exam_session_test.dart) | Exam, Question, Performance, and Session JSON round-trips. |
-| **Validators** | [`test/validators_test.dart`](test/validators_test.dart) | Question, Exam, and Session parameter validation rules. |
-| **Widget UI Tests** | [`test/widget_test.dart`](test/widget_test.dart) | Screen rendering, navigation tabs, exam simulator controls, practice mode triggers. |
+* **100% Offline-First**: All data is stored locally on the user's device using JSON files in the application documents directory (`mcq_data/`).
+* **No Remote Telemetry**: The app does not transmit exam data, student profiles, or test answers to external servers.
+* **Atomic Persistence**: Disk writes utilize temporary staging files and atomic replacement to guard against corruption.
+* **Portable Backups**: Users can export full backups or reset all application data anytime via **Settings → Data & Storage**.
+
+---
+
+## 🏛️ Project Architecture
+
+```text
+lib/
+├── main.dart                   # Application entry point & theme listener
+├── models/                     # Data models (Exam, Question, Performance, StudentProfile)
+├── repositories/               # Storage repository abstraction & atomic IO implementation
+├── services/                   # Business logic (AnalyticsService, ImportService, BackupService, StreakService)
+├── screens/                    # UI screens (Home, Exam, Practice, QuestionBank, Statistics, Settings, Welcome)
+├── theme/                      # Centralized design tokens (AppTheme, Light & Dark themes)
+├── utils/                      # Input validators & helpers
+└── widgets/                    # Reusable components (AppLogo, etc.)
+```
+
+---
+
+## 🧪 Testing & Verification
+
+Run the full automated test suite (including model serialization, student isolation, atomic persistence, import engine, and widget tests):
+
+```bash
+# Code formatting check
+dart format .
+
+# Static analyzer
+flutter analyze
+
+# Automated tests
+flutter test
+```
+
+---
+
+## 📦 Building for Release
+
+```bash
+# Android APK
+flutter build apk --release
+
+# macOS Desktop
+flutter build macos --release
+
+# iOS Bundle
+flutter build ipa --release
+```
+
+For detailed release instructions, see [docs/releasing.md](docs/releasing.md).
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before submitting pull requests.
+
+---
+
+## 🔒 Security
+
+For security vulnerability reporting, please see [SECURITY.md](SECURITY.md).
 
 ---
 
 ## 📄 License
+
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

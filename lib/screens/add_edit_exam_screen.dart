@@ -305,7 +305,8 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
             icon: const Icon(Icons.settings),
             tooltip: 'Exam Settings',
             onPressed: () async {
-              final pctCtrl = TextEditingController(text: exam.passingPercentage.toString());
+              final pctCtrl = TextEditingController(
+                  text: exam.passingPercentage.toString());
               final nameCtrl = TextEditingController(text: exam.name);
               final ok = await showDialog<bool>(
                 context: context,
@@ -316,7 +317,8 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
                     children: [
                       TextField(
                         controller: nameCtrl,
-                        decoration: const InputDecoration(labelText: 'Exam name'),
+                        decoration:
+                            const InputDecoration(labelText: 'Exam name'),
                       ),
                       const SizedBox(height: 16),
                       TextField(
@@ -347,13 +349,17 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
                 if (newPct != null && newPct >= 1 && newPct <= 100) {
                   setState(() {
                     exam.passingPercentage = newPct;
-                    exam.name = nameCtrl.text.trim().isEmpty ? exam.name : nameCtrl.text.trim();
+                    exam.name = nameCtrl.text.trim().isEmpty
+                        ? exam.name
+                        : nameCtrl.text.trim();
                   });
                   await _save();
                 } else {
                   if (mounted) {
                     ScaffoldMessenger.of(this.context).showSnackBar(
-                      const SnackBar(content: Text('Passing percentage must be between 1 and 100.')),
+                      const SnackBar(
+                          content: Text(
+                              'Passing percentage must be between 1 and 100.')),
                     );
                   }
                 }

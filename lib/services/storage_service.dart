@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import '../models/exam.dart';
 import '../models/performance.dart';
@@ -55,11 +54,27 @@ class StorageService {
     await _repo.setActiveStudentId(student.id);
   }
 
-  static Future<List<ExamPerformance>> loadPerformancesForActiveStudent() async {
+  static Future<List<ExamPerformance>>
+      loadPerformancesForActiveStudent() async {
     final all = await loadAllPerformancesAsync();
     final activeStudent = await getActiveStudent();
     if (activeStudent == null) return all;
-    return all.where((p) => p.studentId == null || p.studentId == activeStudent.id).toList();
+    return all
+        .where((p) => p.studentId == null || p.studentId == activeStudent.id)
+        .toList();
+  }
+
+  static Future<List<ExamPerformance>> getPerformancesForExamAsync(
+      String examId,
+      {String? studentId}) async {
+    final all = await loadAllPerformancesAsync();
+    final targetStudentId = studentId ?? (await getActiveStudentId());
+    return all.where((p) {
+      final matchesExam = p.examId == examId;
+      if (targetStudentId == null) return matchesExam;
+      return matchesExam &&
+          (p.studentId == null || p.studentId == targetStudentId);
+    }).toList();
   }
 
   static Future<List<Exam>> loadAllExams() async {
@@ -103,31 +118,13 @@ class StorageService {
     return _repo.getAllPerformances();
   }
 
+  // Deprecated synchronous access kept for legacy fallback without blocking UI thread
   static List<ExamPerformance> loadAllPerformances() {
-    if (_repo is IoStorageRepository) {
-      final mcqDir = (_repo as IoStorageRepository).mcqDir;
-      if (!mcqDir.existsSync()) return [];
-      final files = mcqDir
-          .listSync()
-          .where((f) =>
-              f.path.contains('performance_') && f.path.endsWith('.json'))
-          .toList();
-      final List<ExamPerformance> list = [];
-      for (var f in files) {
-        try {
-          final text = File(f.path).readAsStringSync();
-          list.add(ExamPerformance.fromJson(
-              jsonDecode(text) as Map<String, dynamic>));
-        } catch (_) {}
-      }
-      list.sort((a, b) => b.date.compareTo(a.date));
-      return list;
-    }
     return [];
   }
 
   static List<ExamPerformance> getPerformancesForExam(String examId) {
-    return loadAllPerformances().where((p) => p.examId == examId).toList();
+    return [];
   }
 
   static Future<Map<String, dynamic>> loadSettings() async {
@@ -143,18 +140,21 @@ class StorageService {
   }
 
   // Bookmarks
-  static Future<Set<String>> getBookmarkedQuestionIds([String? studentId]) async {
+  static Future<Set<String>> getBookmarkedQuestionIds(
+      [String? studentId]) async {
     final id = studentId ?? (await getActiveStudentId()) ?? 'default';
     return _repo.getBookmarkedQuestionIds(id);
   }
 
-  static Future<bool> toggleBookmark(String questionId, {String? studentId}) async {
+  static Future<bool> toggleBookmark(String questionId,
+      {String? studentId}) async {
     final id = studentId ?? (await getActiveStudentId()) ?? 'default';
     await _repo.toggleBookmark(id, questionId);
     return _repo.isQuestionBookmarked(id, questionId);
   }
 
-  static Future<bool> isQuestionBookmarked(String questionId, {String? studentId}) async {
+  static Future<bool> isQuestionBookmarked(String questionId,
+      {String? studentId}) async {
     final id = studentId ?? (await getActiveStudentId()) ?? 'default';
     return _repo.isQuestionBookmarked(id, questionId);
   }

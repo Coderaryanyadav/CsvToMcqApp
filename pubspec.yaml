@@ -1,9 +1,11 @@
 name: csv_to_mcq_app
-description: Fully integrated optimized exam app with CSV import, scoring, analytics and tests.
+description: "A cross-platform Flutter application for creating, importing, practicing, and analyzing MCQ examinations with local persistence."
 publish_to: "none"
 version: 1.0.0+1
+
 environment:
   sdk: ">=3.0.0 <4.0.0"
+
 dependencies:
   flutter:
     sdk: flutter
@@ -13,9 +15,14 @@ dependencies:
   file_picker: ^10.3.7
   uuid: ^4.5.2
   csv: ^6.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+
 flutter:
   uses-material-design: true
+  assets:
+    - assets/samples/
+

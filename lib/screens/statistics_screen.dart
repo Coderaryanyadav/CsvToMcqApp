@@ -40,16 +40,19 @@ class _StatisticsScreenState extends State<StatisticsScreen> {
   Future<void> _loadData() async {
     setState(() => loading = true);
     final exams = await StorageService.loadAllExams();
-    final allPerformances = StorageService.loadAllPerformances();
-    final stats = AnalyticsService.getOverallStats();
-    final topics = AnalyticsService.getTopicBreakdown(exams);
-    final diffs = AnalyticsService.getDifficultyBreakdown(exams);
-    final trend = AnalyticsService.getChronologicalTrend();
+    final studentPerformances =
+        await StorageService.loadPerformancesForActiveStudent();
+    final stats = AnalyticsService.getOverallStats(studentPerformances);
+    final topics =
+        AnalyticsService.getTopicBreakdown(studentPerformances, exams);
+    final diffs =
+        AnalyticsService.getDifficultyBreakdown(studentPerformances, exams);
+    final trend = AnalyticsService.getChronologicalTrend(studentPerformances);
 
     if (!mounted) return;
     setState(() {
       allExams = exams;
-      performances = allPerformances;
+      performances = studentPerformances;
       overview = stats;
       topicStats = topics;
       diffStats = diffs;

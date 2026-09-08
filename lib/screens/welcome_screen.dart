@@ -125,7 +125,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 500),
               child: Column(
@@ -165,7 +166,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    widget.isSwitching ? 'Student Profiles' : 'Welcome to QuizPro',
+                    widget.isSwitching
+                        ? 'Student Profiles'
+                        : 'Welcome to QuizPro',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -207,7 +210,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                             padding: const EdgeInsets.all(14),
                             decoration: BoxDecoration(
                               color: isActive
-                                  ? Color(student.avatarColorValue).withValues(alpha: 0.08)
+                                  ? Color(student.avatarColorValue)
+                                      .withValues(alpha: 0.08)
                                   : Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
@@ -223,7 +227,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   width: 46,
                                   height: 46,
                                   decoration: BoxDecoration(
-                                    color: Color(student.avatarColorValue).withValues(alpha: 0.15),
+                                    color: Color(student.avatarColorValue)
+                                        .withValues(alpha: 0.15),
                                     shape: BoxShape.circle,
                                   ),
                                   child: Center(
@@ -236,7 +241,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                 const SizedBox(width: 14),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         student.name,
@@ -256,7 +262,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                           color: isActive
                                               ? Color(student.avatarColorValue)
                                               : AppTheme.secondaryText,
-                                          fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                                          fontWeight: isActive
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
                                         ),
                                       ),
                                     ],
@@ -331,23 +339,28 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                           return Padding(
                             padding: const EdgeInsets.only(right: 8.0),
                             child: InkWell(
-                              onTap: () => setState(() => _selectedEmoji = emoji),
+                              onTap: () =>
+                                  setState(() => _selectedEmoji = emoji),
                               borderRadius: BorderRadius.circular(12),
                               child: Container(
                                 width: 48,
                                 height: 48,
                                 decoration: BoxDecoration(
                                   color: isSel
-                                      ? Color(_selectedColor).withValues(alpha: 0.15)
+                                      ? Color(_selectedColor)
+                                          .withValues(alpha: 0.15)
                                       : Colors.grey.shade100,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSel ? Color(_selectedColor) : Colors.transparent,
+                                    color: isSel
+                                        ? Color(_selectedColor)
+                                        : Colors.transparent,
                                     width: 2,
                                   ),
                                 ),
                                 child: Center(
-                                  child: Text(emoji, style: const TextStyle(fontSize: 24)),
+                                  child: Text(emoji,
+                                      style: const TextStyle(fontSize: 24)),
                                 ),
                               ),
                             ),
@@ -384,12 +397,15 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                                   color: Color(c),
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: isSel ? Colors.black : Colors.transparent,
+                                    color: isSel
+                                        ? Colors.black
+                                        : Colors.transparent,
                                     width: isSel ? 3 : 0,
                                   ),
                                 ),
                                 child: isSel
-                                    ? const Icon(Icons.check, color: Colors.white, size: 20)
+                                    ? const Icon(Icons.check,
+                                        color: Colors.white, size: 20)
                                     : null,
                               ),
                             ),
@@ -403,8 +419,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       onPressed: _createNewStudent,
                       icon: const Icon(Icons.check),
                       label: Text(
-                        _students.isEmpty ? 'Get Started' : 'Save & Select Student',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        _students.isEmpty
+                            ? 'Get Started'
+                            : 'Save & Select Student',
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
                       ),
                       style: FilledButton.styleFrom(
                         backgroundColor: Color(_selectedColor),

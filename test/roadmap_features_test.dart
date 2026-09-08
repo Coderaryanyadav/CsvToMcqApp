@@ -29,7 +29,8 @@ void main() {
   late Directory tempTestDir;
 
   setUp(() async {
-    tempTestDir = await Directory.systemTemp.createTemp('roadmap_features_test_');
+    tempTestDir =
+        await Directory.systemTemp.createTemp('roadmap_features_test_');
     final repo = TestStorageRepository(tempTestDir);
     StorageService.setRepository(repo);
     await StorageService.init();
@@ -123,18 +124,22 @@ void main() {
 
   group('Feature 4: Bookmarking & Starred Revision', () {
     test('Toggle bookmarks on and off per student profile', () async {
-      final s1 = StudentProfile(id: 's1', name: 'Alice', createdAt: DateTime.now());
-      final s2 = StudentProfile(id: 's2', name: 'Bob', createdAt: DateTime.now());
+      final s1 =
+          StudentProfile(id: 's1', name: 'Alice', createdAt: DateTime.now());
+      final s2 =
+          StudentProfile(id: 's2', name: 'Bob', createdAt: DateTime.now());
 
       await StorageService.saveStudent(s1);
       await StorageService.saveStudent(s2);
 
       // Star Q1 for Alice
-      final isStarred1 = await StorageService.toggleBookmark('Q1', studentId: s1.id);
+      final isStarred1 =
+          await StorageService.toggleBookmark('Q1', studentId: s1.id);
       expect(isStarred1, true);
 
       // Verify Alice has Q1 bookmarked
-      final aliceBookmarks = await StorageService.getBookmarkedQuestionIds(s1.id);
+      final aliceBookmarks =
+          await StorageService.getBookmarkedQuestionIds(s1.id);
       expect(aliceBookmarks.contains('Q1'), true);
 
       // Verify Bob has no bookmarks
@@ -142,10 +147,12 @@ void main() {
       expect(bobBookmarks.contains('Q1'), false);
 
       // Unstar Q1 for Alice
-      final isStarred2 = await StorageService.toggleBookmark('Q1', studentId: s1.id);
+      final isStarred2 =
+          await StorageService.toggleBookmark('Q1', studentId: s1.id);
       expect(isStarred2, false);
 
-      final aliceBookmarksAfter = await StorageService.getBookmarkedQuestionIds(s1.id);
+      final aliceBookmarksAfter =
+          await StorageService.getBookmarkedQuestionIds(s1.id);
       expect(aliceBookmarksAfter.contains('Q1'), false);
     });
   });
@@ -196,7 +203,6 @@ void main() {
       );
       await StorageService.savePerformance(perf);
 
-
       // Export full package
       final backup = await StorageService.exportFullBackupData();
       expect(backup['app'], 'QuizPro');
@@ -217,7 +223,8 @@ void main() {
       expect(restoredExams.first.name, 'AWS Solutions Architect');
       expect(restoredExams.first.questions.length, 2);
 
-      final restoredBookmarks = await StorageService.getBookmarkedQuestionIds(student.id);
+      final restoredBookmarks =
+          await StorageService.getBookmarkedQuestionIds(student.id);
       expect(restoredBookmarks.contains('Q1'), true);
     });
   });

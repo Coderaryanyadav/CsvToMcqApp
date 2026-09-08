@@ -54,7 +54,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
 
   Future<void> _loadBookmarks() async {
     final activeStudent = await StorageService.getActiveStudent();
-    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    final ids =
+        await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
     if (mounted) {
       setState(() {
         _bookmarkedIds = ids;
@@ -193,11 +194,11 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to import: $e')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to import: $e')),
+      );
     }
+  }
 
   Future<void> _deleteCurrentExam() async {
     if (_selectedExam == null) return;
@@ -1010,7 +1011,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       onChanged: (val) {
                         if (val != null) {
                           setState(() {
-                            _selectedExam = _exams.firstWhere((e) => e.id == val);
+                            _selectedExam =
+                                _exams.firstWhere((e) => e.id == val);
                             _selectedTopic = 'All Topics';
                             _recomputeFilteredQuestions();
                           });
@@ -1050,7 +1052,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                     } else if (val == 'export') {
                       if (_selectedExam != null) {
                         final messenger = ScaffoldMessenger.of(context);
-                        ImportService.exportToCsvFile(_selectedExam!).then((path) {
+                        ImportService.exportToCsvFile(_selectedExam!)
+                            .then((path) {
                           if (path != null) {
                             messenger.showSnackBar(
                               SnackBar(
@@ -1144,23 +1147,33 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       // Starred Filter Chip
                       FilterChip(
                         avatar: Icon(
-                          _onlyStarred ? Icons.star_rounded : Icons.star_outline_rounded,
+                          _onlyStarred
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
                           size: 16,
-                          color: _onlyStarred ? const Color(0xFF92400E) : Colors.grey,
+                          color: _onlyStarred
+                              ? const Color(0xFF92400E)
+                              : Colors.grey,
                         ),
                         label: Text(
                           'Starred (${_selectedExam != null ? _selectedExam!.questions.where((q) => _bookmarkedIds.contains(q.id)).length : 0})',
                           style: TextStyle(
                             fontSize: 12,
-                            fontWeight: _onlyStarred ? FontWeight.bold : FontWeight.normal,
-                            color: _onlyStarred ? const Color(0xFF92400E) : AppTheme.text,
+                            fontWeight: _onlyStarred
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            color: _onlyStarred
+                                ? const Color(0xFF92400E)
+                                : AppTheme.text,
                           ),
                         ),
                         selected: _onlyStarred,
                         selectedColor: const Color(0xFFFEF3C7),
                         checkmarkColor: const Color(0xFF92400E),
                         side: BorderSide(
-                          color: _onlyStarred ? const Color(0xFFFCD34D) : Colors.grey.shade300,
+                          color: _onlyStarred
+                              ? const Color(0xFFFCD34D)
+                              : Colors.grey.shade300,
                         ),
                         onSelected: (v) {
                           setState(() {
@@ -1325,9 +1338,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 : theme.colorScheme.outlineVariant,
                           ),
                         ),
-                        color: isStarred
-                            ? const Color(0xFFFFFDF5)
-                            : Colors.white,
+                        color:
+                            isStarred ? const Color(0xFFFFFDF5) : Colors.white,
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(
@@ -1348,8 +1360,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 12,
-                                        color:
-                                            theme.colorScheme.onPrimaryContainer,
+                                        color: theme
+                                            .colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                   ),
@@ -1462,15 +1474,13 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 spacing: 6,
                                 runSpacing: 4,
                                 children: [
-                                  if (q.topic != null &&
-                                      q.topic!.isNotEmpty)
+                                  if (q.topic != null && q.topic!.isNotEmpty)
                                     Container(
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
                                         color: Colors.grey.shade100,
-                                        borderRadius:
-                                            BorderRadius.circular(4),
+                                        borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
                                         q.topic!,
@@ -1485,8 +1495,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                         horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.orange.shade50,
-                                      borderRadius:
-                                        BorderRadius.circular(4),
+                                      borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
                                       'Diff: ${q.difficulty}/5',

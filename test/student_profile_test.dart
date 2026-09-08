@@ -4,7 +4,8 @@ import 'package:csv_to_mcq_app/models/performance.dart';
 
 void main() {
   group('StudentProfile Model Tests', () {
-    test('StudentProfile model instantiates and serializes to JSON correctly', () {
+    test('StudentProfile model instantiates and serializes to JSON correctly',
+        () {
       final student = StudentProfile(
         id: 'student_1',
         name: 'Aryan Yadav',

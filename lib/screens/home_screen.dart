@@ -53,8 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final allPerfs = await StorageService.loadPerformancesForActiveStudent();
     final settings = await StorageService.loadSettings();
     final dailyGoal = (settings['dailyGoal'] as num?)?.toInt() ?? 20;
-    final streak = StreakService.calculateStreakInfo(allPerfs, dailyGoal: dailyGoal);
-    final bookmarks = await StorageService.getBookmarkedQuestionIds(student?.id);
+    final streak =
+        StreakService.calculateStreakInfo(allPerfs, dailyGoal: dailyGoal);
+    final bookmarks =
+        await StorageService.getBookmarkedQuestionIds(student?.id);
 
     if (!mounted) return;
     setState(() {
@@ -474,7 +476,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final isMobile = MediaQuery.of(context).size.width < 900;
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       bottomNavigationBar: isMobile
           ? NavigationBar(
               selectedIndex: (_activeNavTab >= 0 && _activeNavTab <= 2)
@@ -529,14 +531,18 @@ class _HomeScreenState extends State<HomeScreen> {
   // Top QuizPro SaaS Navigation Bar
   Widget _buildTopNavBar() {
     final isMobile = MediaQuery.of(context).size.width < 900;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfaceColor = Theme.of(context).cardTheme.color ??
+        Theme.of(context).colorScheme.surface;
+    final borderColor = Theme.of(context).colorScheme.outline;
 
     if (isMobile) {
       return Container(
         height: 56,
         padding: const EdgeInsets.symmetric(horizontal: 12),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(bottom: BorderSide(color: AppTheme.border)),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          border: Border(bottom: BorderSide(color: borderColor)),
         ),
         child: Row(
           children: [
@@ -551,14 +557,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 decoration: BoxDecoration(
                   color: (activeStudent != null
                           ? Color(activeStudent!.avatarColorValue)
-                          : AppTheme.primaryNavy)
-                      .withValues(alpha: 0.1),
+                          : (isDark
+                              ? AppTheme.accentBlue
+                              : AppTheme.primaryNavy))
+                      .withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: (activeStudent != null
                             ? Color(activeStudent!.avatarColorValue)
-                            : AppTheme.primaryNavy)
-                        .withValues(alpha: 0.3),
+                            : (isDark
+                                ? AppTheme.accentBlue
+                                : AppTheme.primaryNavy))
+                        .withValues(alpha: 0.35),
                   ),
                 ),
                 child: Row(
@@ -574,7 +584,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontWeight: FontWeight.bold,
                         color: activeStudent != null
                             ? Color(activeStudent!.avatarColorValue)
-                            : AppTheme.text,
+                            : Theme.of(context).colorScheme.onSurface,
                       ),
                     ),
                     const Icon(Icons.arrow_drop_down,
@@ -602,9 +612,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppTheme.border)),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border(bottom: BorderSide(color: borderColor)),
       ),
       child: Row(
         children: [
@@ -1051,7 +1061,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Text(
                       'No practice sessions yet. Start a session to see your progress here.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: AppTheme.secondaryText, fontSize: 13),
+                      style: TextStyle(
+                          color: AppTheme.secondaryText, fontSize: 13),
                     ),
                   ),
                 )
@@ -1191,7 +1202,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (streakInfo.longestStreak > 0) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.amber.shade100,
                               borderRadius: BorderRadius.circular(6),
@@ -1225,7 +1237,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: isMet
                       ? AppTheme.success.withValues(alpha: 0.12)
@@ -1301,7 +1314,8 @@ class _HomeScreenState extends State<HomeScreen> {
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: const Color(0xFFFCD34D)),
             ),
-            child: const Icon(Icons.star_rounded, color: Color(0xFFD97706), size: 24),
+            child: const Icon(Icons.star_rounded,
+                color: Color(0xFFD97706), size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -1320,7 +1334,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: const Color(0xFFD97706),
                         borderRadius: BorderRadius.circular(10),
@@ -1350,7 +1365,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
           FilledButton.icon(
             icon: const Icon(Icons.play_arrow_rounded, size: 18),
-            label: const Text('Revise Now', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            label: const Text('Revise Now',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
             style: FilledButton.styleFrom(
               backgroundColor: const Color(0xFFD97706),
               foregroundColor: Colors.white,
@@ -1439,7 +1455,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             decoration: BoxDecoration(
                               color: const Color(0xFFFEF3C7),
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: const Color(0xFFFCD34D)),
+                              border:
+                                  Border.all(color: const Color(0xFFFCD34D)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1474,8 +1491,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: AppTheme.background,
                   borderRadius: BorderRadius.circular(12),
@@ -1597,7 +1613,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.school_outlined, size: 16),
-                          label: const Text('Practice', style: TextStyle(fontSize: 12)),
+                          label: const Text('Practice',
+                              style: TextStyle(fontSize: 12)),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
@@ -1621,7 +1638,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(
                         child: FilledButton.icon(
                           icon: const Icon(Icons.timer_outlined, size: 16),
-                          label: const Text('Start Exam', style: TextStyle(fontSize: 12)),
+                          label: const Text('Start Exam',
+                              style: TextStyle(fontSize: 12)),
                           style: FilledButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 8),
                           ),
@@ -1643,11 +1661,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       if (starredInExam > 0) ...[
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
-                          icon: const Icon(Icons.star_rounded, size: 16, color: Color(0xFFD97706)),
+                          icon: const Icon(Icons.star_rounded,
+                              size: 16, color: Color(0xFFD97706)),
                           label: Text('⭐ $starredInExam',
-                              style: const TextStyle(fontSize: 12, color: Color(0xFF92400E))),
+                              style: const TextStyle(
+                                  fontSize: 12, color: Color(0xFF92400E))),
                           style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 8),
                             side: const BorderSide(color: Color(0xFFFCD34D)),
                             backgroundColor: const Color(0xFFFFFBEB),
                           ),
@@ -1674,12 +1695,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       TextButton.icon(
                         icon: const Icon(Icons.file_upload_outlined, size: 14),
-                        label: const Text('Import CSV', style: TextStyle(fontSize: 12)),
+                        label: const Text('Import CSV',
+                            style: TextStyle(fontSize: 12)),
                         onPressed: () => _startImportFlow(exam),
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.storage_outlined, size: 14),
-                        label: const Text('Question Bank', style: TextStyle(fontSize: 12)),
+                        label: const Text('Question Bank',
+                            style: TextStyle(fontSize: 12)),
                         onPressed: () {
                           Navigator.push(
                             context,
@@ -1711,7 +1734,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-
   Widget _buildActivityTile(ExamPerformance perf) {
     final pct = perf.percentage;
     final color = pct >= 80
@@ -1737,7 +1759,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(
               '${pct.round()}%',
               style: TextStyle(
-                  fontWeight: FontWeight.bold, color: color, fontSize: isMobile ? 12 : 13),
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                  fontSize: isMobile ? 12 : 13),
             ),
           ),
           SizedBox(width: isMobile ? 10 : 16),
@@ -1758,7 +1782,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(
                   '${perf.correct}/${perf.totalQuestions} correct • ${perf.date.toLocal().toString().split(' ').first}',
                   style: TextStyle(
-                      color: AppTheme.secondaryText, fontSize: isMobile ? 11 : 13),
+                      color: AppTheme.secondaryText,
+                      fontSize: isMobile ? 11 : 13),
                 ),
               ],
             ),
@@ -1772,7 +1797,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               visualDensity: VisualDensity.compact,
             ),
-            child: Text('Retake', style: TextStyle(fontSize: isMobile ? 12 : 13)),
+            child:
+                Text('Retake', style: TextStyle(fontSize: isMobile ? 12 : 13)),
             onPressed: () {
               Navigator.push(
                 context,
@@ -1834,7 +1860,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   FilledButton.icon(
                     icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add Exam', style: TextStyle(fontSize: 12)),
+                    label:
+                        const Text('Add Exam', style: TextStyle(fontSize: 12)),
                     onPressed: _createExamDialog,
                   ),
                 ],
@@ -1858,13 +1885,18 @@ class _HomeScreenState extends State<HomeScreen> {
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: ['All', 'In Progress', 'Not Started', 'Completed']
-                          .map((f) {
+                      children: [
+                        'All',
+                        'In Progress',
+                        'Not Started',
+                        'Completed'
+                      ].map((f) {
                         final isSel = _examFilter == f;
                         return Padding(
                           padding: const EdgeInsets.only(right: 8.0),
                           child: ChoiceChip(
-                            label: Text(f, style: const TextStyle(fontSize: 12)),
+                            label:
+                                Text(f, style: const TextStyle(fontSize: 12)),
                             selected: isSel,
                             onSelected: (v) => setState(() => _examFilter = f),
                           ),

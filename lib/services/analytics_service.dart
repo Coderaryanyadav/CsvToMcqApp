@@ -1,6 +1,5 @@
 import '../models/exam.dart';
 import '../models/performance.dart';
-import 'storage_service.dart';
 
 class TopicStat {
   final String topic;
@@ -116,7 +115,7 @@ class AnalyticsService {
 
     final scoreTrend = chronological.map((p) => p.percentage).toList();
 
-    // Topic performance aggregation
+    // Topic performance aggregation (including historical snapshot awareness)
     final topicTotals = <String, int>{};
     final topicCorrects = <String, int>{};
     final diffTotals = <String, int>{};
@@ -173,8 +172,8 @@ class AnalyticsService {
     );
   }
 
-  static Map<String, dynamic> getOverallStats() {
-    final performances = StorageService.loadAllPerformances();
+  static Map<String, dynamic> getOverallStats(
+      List<ExamPerformance> performances) {
     final summary = calculateSummary(performances);
 
     return {
@@ -189,13 +188,15 @@ class AnalyticsService {
     };
   }
 
-  static List<Map<String, dynamic>> getChronologicalTrend({String? examId}) {
-    List<ExamPerformance> performances = examId != null
-        ? StorageService.getPerformancesForExam(examId)
-        : StorageService.loadAllPerformances();
+  static List<Map<String, dynamic>> getChronologicalTrend(
+      List<ExamPerformance> performances,
+      {String? examId}) {
+    List<ExamPerformance> filtered = examId != null
+        ? performances.where((p) => p.examId == examId).toList()
+        : List<ExamPerformance>.from(performances);
 
     // Sort strictly chronological: oldest -> newest
-    final chronological = List<ExamPerformance>.from(performances)
+    final chronological = List<ExamPerformance>.from(filtered)
       ..sort((a, b) => a.date.compareTo(b.date));
 
     return chronological.map((p) {
@@ -212,14 +213,18 @@ class AnalyticsService {
     }).toList();
   }
 
-  static Map<String, TopicStat> getTopicBreakdown(List<Exam> allExams) {
-    final performances = StorageService.loadAllPerformances();
+  static Map<String, TopicStat> getTopicBreakdown(
+    List<ExamPerformance> performances, [
+    List<Exam>? allExams,
+  ]) {
     final questionTopicMap = <String, String>{};
 
-    for (final exam in allExams) {
-      for (final q in exam.questions) {
-        if (q.topic != null && q.topic!.trim().isNotEmpty) {
-          questionTopicMap[q.id] = q.topic!.trim();
+    if (allExams != null) {
+      for (final exam in allExams) {
+        for (final q in exam.questions) {
+          if (q.topic != null && q.topic!.trim().isNotEmpty) {
+            questionTopicMap[q.id] = q.topic!.trim();
+          }
         }
       }
     }
@@ -228,11 +233,23 @@ class AnalyticsService {
     final topicCorrects = <String, int>{};
 
     for (final perf in performances) {
-      for (final entry in perf.questionResults.entries) {
-        final topic = questionTopicMap[entry.key] ?? 'General';
-        topicTotals[topic] = (topicTotals[topic] ?? 0) + 1;
-        if (entry.value) {
-          topicCorrects[topic] = (topicCorrects[topic] ?? 0) + 1;
+      if (perf.topicPerformance.isNotEmpty) {
+        perf.topicPerformance.forEach((topic, counts) {
+          topicTotals[topic] =
+              (topicTotals[topic] ?? 0) + (counts['total'] ?? 0);
+          topicCorrects[topic] =
+              (topicCorrects[topic] ?? 0) + (counts['correct'] ?? 0);
+        });
+      } else {
+        for (final entry in perf.questionResults.entries) {
+          final snapshot = perf.questionSnapshots[entry.key];
+          final topic = snapshot?['topic']?.toString() ??
+              questionTopicMap[entry.key] ??
+              'General';
+          topicTotals[topic] = (topicTotals[topic] ?? 0) + 1;
+          if (entry.value) {
+            topicCorrects[topic] = (topicCorrects[topic] ?? 0) + 1;
+          }
         }
       }
     }
@@ -250,8 +267,11 @@ class AnalyticsService {
     return result;
   }
 
-  static List<String> identifyWeakTopics(List<Exam> allExams) {
-    final breakdown = getTopicBreakdown(allExams);
+  static List<String> identifyWeakTopics(
+    List<ExamPerformance> performances, [
+    List<Exam>? allExams,
+  ]) {
+    final breakdown = getTopicBreakdown(performances, allExams);
     final weak = <String>[];
 
     breakdown.forEach((topic, stat) {
@@ -263,13 +283,17 @@ class AnalyticsService {
     return weak;
   }
 
-  static Map<int, DifficultyStat> getDifficultyBreakdown(List<Exam> allExams) {
-    final performances = StorageService.loadAllPerformances();
+  static Map<int, DifficultyStat> getDifficultyBreakdown(
+    List<ExamPerformance> performances, [
+    List<Exam>? allExams,
+  ]) {
     final questionDiffMap = <String, int>{};
 
-    for (final exam in allExams) {
-      for (final q in exam.questions) {
-        questionDiffMap[q.id] = q.difficulty;
+    if (allExams != null) {
+      for (final exam in allExams) {
+        for (final q in exam.questions) {
+          questionDiffMap[q.id] = q.difficulty;
+        }
       }
     }
 
@@ -277,11 +301,22 @@ class AnalyticsService {
     final diffCorrects = <int, int>{};
 
     for (final perf in performances) {
-      for (final entry in perf.questionResults.entries) {
-        final diff = questionDiffMap[entry.key] ?? 3;
-        diffTotals[diff] = (diffTotals[diff] ?? 0) + 1;
-        if (entry.value) {
-          diffCorrects[diff] = (diffCorrects[diff] ?? 0) + 1;
+      if (perf.difficultyPerformance.isNotEmpty) {
+        perf.difficultyPerformance.forEach((diffStr, counts) {
+          final d = int.tryParse(diffStr) ?? 3;
+          diffTotals[d] = (diffTotals[d] ?? 0) + (counts['total'] ?? 0);
+          diffCorrects[d] = (diffCorrects[d] ?? 0) + (counts['correct'] ?? 0);
+        });
+      } else {
+        for (final entry in perf.questionResults.entries) {
+          final snapshot = perf.questionSnapshots[entry.key];
+          final diff = (snapshot?['difficulty'] as num?)?.toInt() ??
+              questionDiffMap[entry.key] ??
+              3;
+          diffTotals[diff] = (diffTotals[diff] ?? 0) + 1;
+          if (entry.value) {
+            diffCorrects[diff] = (diffCorrects[diff] ?? 0) + 1;
+          }
         }
       }
     }

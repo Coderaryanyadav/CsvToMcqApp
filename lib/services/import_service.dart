@@ -116,7 +116,8 @@ class ImportService {
     // Strip UTF-8 BOM if present in any representation
     if (text.startsWith('\uFEFF')) {
       text = text.substring(1);
-    } else if (text.startsWith('\u00EF\u00BB\u00BF') || text.startsWith('ï»¿')) {
+    } else if (text.startsWith('\u00EF\u00BB\u00BF') ||
+        text.startsWith('ï»¿')) {
       text = text.substring(3);
     }
     text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');

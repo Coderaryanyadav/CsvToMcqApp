@@ -67,7 +67,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
   Future<void> _loadBookmarks() async {
     final activeStudent = await StorageService.getActiveStudent();
-    final ids = await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
+    final ids =
+        await StorageService.getBookmarkedQuestionIds(activeStudent?.id);
     if (mounted) {
       setState(() {
         _bookmarkedIds = ids;
@@ -108,7 +109,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
   int get _starredQuestionsCount {
     if (selectedExam == null) return 0;
-    return selectedExam!.questions.where((q) => _bookmarkedIds.contains(q.id)).length;
+    return selectedExam!.questions
+        .where((q) => _bookmarkedIds.contains(q.id))
+        .length;
   }
 
   int get _availableQuestionsCount {
@@ -124,7 +127,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       if (selectedDifficulty == 'Easy') {
         list = list.where((q) => q.difficulty <= 2).toList();
       } else if (selectedDifficulty == 'Medium') {
-        list = list.where((q) => q.difficulty == 3 || q.difficulty == 4).toList();
+        list =
+            list.where((q) => q.difficulty == 3 || q.difficulty == 4).toList();
       } else if (selectedDifficulty == 'Hard') {
         list = list.where((q) => q.difficulty == 5).toList();
       }
@@ -135,7 +139,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   int get _effectiveQuestionCount {
     if (isAllQuestions) return _availableQuestionsCount;
     if (isCustomCount) {
-      return int.tryParse(_customCountCtrl.text.trim()) ?? selectedQuestionCount;
+      return int.tryParse(_customCountCtrl.text.trim()) ??
+          selectedQuestionCount;
     }
     return selectedQuestionCount;
   }
@@ -222,26 +227,31 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
   void _startSession() {
     if (selectedExam == null) return;
-    
+
     if (isCustomCount) {
       final val = int.tryParse(_customCountCtrl.text.trim());
       if (val != null && val > 0) {
         selectedQuestionCount = val;
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a valid number of questions.'), backgroundColor: AppTheme.danger),
+          const SnackBar(
+              content: Text('Please enter a valid number of questions.'),
+              backgroundColor: AppTheme.danger),
         );
         return;
       }
     }
-    
+
     if (isCustomDuration) {
       final val = int.tryParse(_customDurationCtrl.text.trim());
       if (val != null && val >= 0) {
         selectedDurationMin = val;
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please enter a valid duration in minutes (0 for untimed).'), backgroundColor: AppTheme.danger),
+          const SnackBar(
+              content: Text(
+                  'Please enter a valid duration in minutes (0 for untimed).'),
+              backgroundColor: AppTheme.danger),
         );
         return;
       }
@@ -422,7 +432,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
                 // 3. QUESTIONS COUNT
                 _sectionTitle(
-                    '3. Number of Questions ($_availableQuestionsCount Available)', Icons.format_list_numbered),
+                    '3. Number of Questions ($_availableQuestionsCount Available)',
+                    Icons.format_list_numbered),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -442,7 +453,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                 label: Text('$count Questions'),
                                 selected: isSel,
                                 avatar: isOver
-                                    ? const Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange)
+                                    ? const Icon(Icons.warning_amber_rounded,
+                                        size: 16, color: Colors.orange)
                                     : null,
                                 onSelected: (v) {
                                   if (v) {
@@ -490,8 +502,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               controller: _customCountCtrl,
                               keyboardType: TextInputType.number,
                               decoration: InputDecoration(
-                                labelText: 'Custom number of questions (Max: $_availableQuestionsCount)',
-                                hintText: 'Enter a number (1 - $_availableQuestionsCount)',
+                                labelText:
+                                    'Custom number of questions (Max: $_availableQuestionsCount)',
+                                hintText:
+                                    'Enter a number (1 - $_availableQuestionsCount)',
                                 border: const OutlineInputBorder(),
                               ),
                               onChanged: (_) => setState(() {}),
@@ -500,7 +514,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         if (_questionCountError != null) ...[
                           const SizedBox(height: 12),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
                               borderRadius: BorderRadius.circular(8),
@@ -508,7 +523,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.error_outline, size: 20, color: Colors.red.shade700),
+                                Icon(Icons.error_outline,
+                                    size: 20, color: Colors.red.shade700),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
@@ -543,7 +559,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                           runSpacing: 10,
                           children: [
                             ..._presetDurations.map((duration) {
-                              final isSel = !isCustomDuration && selectedDurationMin == duration;
+                              final isSel = !isCustomDuration &&
+                                  selectedDurationMin == duration;
                               final label = duration == 0
                                   ? 'Untimed (No Limit)'
                                   : '$duration Minutes';
@@ -581,7 +598,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               keyboardType: TextInputType.number,
                               decoration: const InputDecoration(
                                 labelText: 'Custom duration (minutes)',
-                                hintText: 'Enter duration in minutes (0 for untimed)',
+                                hintText:
+                                    'Enter duration in minutes (0 for untimed)',
                               ),
                             ),
                           ),
@@ -656,10 +674,15 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           secondary: Icon(
-                            onlyStarred ? Icons.star_rounded : Icons.star_outline_rounded,
-                            color: onlyStarred ? Colors.amber.shade700 : AppTheme.secondaryText,
+                            onlyStarred
+                                ? Icons.star_rounded
+                                : Icons.star_outline_rounded,
+                            color: onlyStarred
+                                ? Colors.amber.shade700
+                                : AppTheme.secondaryText,
                           ),
-                          title: const Text('⭐ Starred Questions Only (Revision Mode)',
+                          title: const Text(
+                              '⭐ Starred Questions Only (Revision Mode)',
                               style: TextStyle(fontWeight: FontWeight.w600)),
                           subtitle: Text(
                               'Target $_starredQuestionsCount starred question(s) in "${selectedExam?.name ?? 'Exam'}"'),

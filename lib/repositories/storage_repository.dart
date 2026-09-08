@@ -65,6 +65,28 @@ class IoStorageRepository implements IStorageRepository {
     _initialized = true;
   }
 
+  /// True atomic file writing helper: writes to a temporary file, flushes to disk,
+  /// and atomically renames to the target path.
+  Future<void> _writeAtomic(File file, String content) async {
+    final tempFile =
+        File('${file.path}.tmp_${DateTime.now().microsecondsSinceEpoch}');
+    try {
+      await tempFile.writeAsString(content, flush: true);
+      await tempFile.rename(file.path);
+    } catch (_) {
+      // Fallback for file systems or platforms where atomic rename is restricted
+      try {
+        await file.writeAsString(content, flush: true);
+      } finally {
+        if (await tempFile.exists()) {
+          try {
+            await tempFile.delete();
+          } catch (_) {}
+        }
+      }
+    }
+  }
+
   @override
   Future<Set<String>> getBookmarkedQuestionIds(String studentId) async {
     await init();
@@ -99,7 +121,7 @@ class IoStorageRepository implements IStorageRepository {
     }
     _cachedBookmarks[studentId] = bookmarks;
     final file = File('${mcqDir.path}/bookmarks_$studentId.json');
-    await file.writeAsString(jsonEncode(bookmarks.toList()), flush: true);
+    await _writeAtomic(file, jsonEncode(bookmarks.toList()));
   }
 
   @override
@@ -180,10 +202,11 @@ class IoStorageRepository implements IStorageRepository {
       final map = data['bookmarks'] as Map<String, dynamic>;
       for (final entry in map.entries) {
         final studentId = entry.key;
-        final list = (entry.value as List<dynamic>).map((e) => e.toString()).toSet();
+        final list =
+            (entry.value as List<dynamic>).map((e) => e.toString()).toSet();
         _cachedBookmarks[studentId] = list;
         final file = File('${mcqDir.path}/bookmarks_$studentId.json');
-        await file.writeAsString(jsonEncode(list.toList()), flush: true);
+        await _writeAtomic(file, jsonEncode(list.toList()));
       }
     }
 
@@ -202,17 +225,16 @@ class IoStorageRepository implements IStorageRepository {
     }
 
     final List<Exam> exams = [];
-    final files = mcqDir
-        .listSync()
-        .where((f) {
-          final filename = p.basename(f.path);
-          return filename.endsWith('.json') &&
-              !filename.startsWith('performance_') &&
-              !filename.startsWith('session_') &&
-              filename != 'settings.json' &&
-              filename != 'students.json';
-        })
-        .toList();
+    final entities = await mcqDir.list().toList();
+    final files = entities.where((f) {
+      final filename = p.basename(f.path);
+      return filename.endsWith('.json') &&
+          !filename.startsWith('performance_') &&
+          !filename.startsWith('session_') &&
+          !filename.startsWith('bookmarks_') &&
+          filename != 'settings.json' &&
+          filename != 'students.json';
+    }).toList();
 
     for (final f in files) {
       try {
@@ -264,7 +286,7 @@ class IoStorageRepository implements IStorageRepository {
     }
 
     final file = File('${mcqDir.path}/${exam.id}.json');
-    await file.writeAsString(jsonEncode(exam.toJson()), flush: true);
+    await _writeAtomic(file, jsonEncode(exam.toJson()));
   }
 
   @override
@@ -286,13 +308,11 @@ class IoStorageRepository implements IStorageRepository {
       return List<ExamPerformance>.from(_cachedPerformances!);
     }
 
-    final files = mcqDir
-        .listSync()
-        .where((f) {
-          final name = p.basename(f.path);
-          return name.startsWith('performance_') && name.endsWith('.json');
-        })
-        .toList();
+    final entities = await mcqDir.list().toList();
+    final files = entities.where((f) {
+      final name = p.basename(f.path);
+      return name.startsWith('performance_') && name.endsWith('.json');
+    }).toList();
 
     final List<ExamPerformance> list = [];
     for (final f in files) {
@@ -315,11 +335,12 @@ class IoStorageRepository implements IStorageRepository {
       _cachedPerformances!.sort((a, b) => b.date.compareTo(a.date));
     }
 
-    final studentTag = performance.studentId != null ? '_${performance.studentId}' : '';
+    final studentTag =
+        performance.studentId != null ? '_${performance.studentId}' : '';
     final file = File(
       '${mcqDir.path}/performance_${performance.examId}_${DateTime.now().microsecondsSinceEpoch}$studentTag.json',
     );
-    await file.writeAsString(jsonEncode(performance.toJson()), flush: true);
+    await _writeAtomic(file, jsonEncode(performance.toJson()));
   }
 
   @override
@@ -327,13 +348,12 @@ class IoStorageRepository implements IStorageRepository {
     await init();
     _cachedPerformances?.removeWhere((p) => p.examId == examId);
 
-    final files = mcqDir
-        .listSync()
-        .where((f) {
-          final name = p.basename(f.path);
-          return name.startsWith('performance_${examId}_') && name.endsWith('.json');
-        })
-        .toList();
+    final entities = await mcqDir.list().toList();
+    final files = entities.where((f) {
+      final name = p.basename(f.path);
+      return name.startsWith('performance_${examId}_') &&
+          name.endsWith('.json');
+    }).toList();
 
     for (final f in files) {
       try {
@@ -361,7 +381,7 @@ class IoStorageRepository implements IStorageRepository {
   Future<void> saveSession(String examId, Map<String, dynamic> session) async {
     await init();
     final file = File('${mcqDir.path}/session_$examId.json');
-    await file.writeAsString(jsonEncode(session), flush: true);
+    await _writeAtomic(file, jsonEncode(session));
   }
 
   @override
@@ -407,7 +427,7 @@ class IoStorageRepository implements IStorageRepository {
     await init();
     _cachedSettings = Map<String, dynamic>.from(settings);
     final file = File('${mcqDir.path}/settings.json');
-    await file.writeAsString(jsonEncode(settings), flush: true);
+    await _writeAtomic(file, jsonEncode(settings));
   }
 
   @override
@@ -417,9 +437,10 @@ class IoStorageRepository implements IStorageRepository {
     _cachedPerformances = null;
     _cachedStudents = null;
     _cachedSettings = null;
+    _cachedBookmarks.clear();
 
     if (await mcqDir.exists()) {
-      final list = mcqDir.listSync();
+      final list = await mcqDir.list().toList();
       for (final f in list) {
         try {
           if (f is File && !f.path.endsWith('settings.json')) {
@@ -478,9 +499,9 @@ class IoStorageRepository implements IStorageRepository {
     }
     _cachedStudents = students;
     final file = File('${mcqDir.path}/students.json');
-    await file.writeAsString(
+    await _writeAtomic(
+      file,
       jsonEncode(students.map((s) => s.toJson()).toList()),
-      flush: true,
     );
   }
 
@@ -491,9 +512,9 @@ class IoStorageRepository implements IStorageRepository {
     students.removeWhere((s) => s.id == id);
     _cachedStudents = students;
     final file = File('${mcqDir.path}/students.json');
-    await file.writeAsString(
+    await _writeAtomic(
+      file,
       jsonEncode(students.map((s) => s.toJson()).toList()),
-      flush: true,
     );
 
     final activeId = await getActiveStudentId();

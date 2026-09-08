@@ -562,9 +562,14 @@ class _ResultScreenState extends State<ResultScreen>
                     ),
                     const SizedBox(height: 10),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : (isRightAnswer ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2)),
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : (isRightAnswer
+                                ? const Color(0xFFDCFCE7)
+                                : const Color(0xFFFEE2E2)),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
@@ -575,7 +580,11 @@ class _ResultScreenState extends State<ResultScreen>
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 12,
-                              color: isDark ? Colors.white70 : (isRightAnswer ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)),
+                              color: isDark
+                                  ? Colors.white70
+                                  : (isRightAnswer
+                                      ? const Color(0xFF14532D)
+                                      : const Color(0xFF7F1D1D)),
                             ),
                           ),
                           Expanded(
@@ -587,7 +596,11 @@ class _ResultScreenState extends State<ResultScreen>
                                       : 'This option is incorrect.'),
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDark ? Colors.white70 : (isRightAnswer ? const Color(0xFF14532D) : const Color(0xFF7F1D1D)),
+                                color: isDark
+                                    ? Colors.white70
+                                    : (isRightAnswer
+                                        ? const Color(0xFF14532D)
+                                        : const Color(0xFF7F1D1D)),
                               ),
                             ),
                           ),

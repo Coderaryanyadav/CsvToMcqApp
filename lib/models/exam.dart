@@ -1,6 +1,8 @@
 import 'package:uuid/uuid.dart';
 import 'question.dart';
 
+const Object _unsetDuration = Object();
+
 class Exam {
   final String id;
   String name;
@@ -59,7 +61,7 @@ class Exam {
     String? provider,
     String? code,
     int? passingPercentage,
-    int? defaultDuration,
+    Object? defaultDuration = _unsetDuration,
     DateTime? createdAt,
     DateTime? updatedAt,
     int? schemaVersion,
@@ -73,7 +75,9 @@ class Exam {
       provider: provider ?? this.provider,
       code: code ?? this.code,
       passingPercentage: passingPercentage ?? this.passingPercentage,
-      defaultDuration: defaultDuration ?? this.defaultDuration,
+      defaultDuration: identical(defaultDuration, _unsetDuration)
+          ? this.defaultDuration
+          : defaultDuration as int?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? DateTime.now(),
       schemaVersion: schemaVersion ?? this.schemaVersion,
@@ -112,6 +116,12 @@ class Exam {
           DateTime.tryParse(j['updatedAt'].toString()) ?? parsedCreated;
     }
 
+    final int? duration = j.containsKey('defaultDuration')
+        ? (j['defaultDuration'] != null
+            ? (j['defaultDuration'] as num).toInt()
+            : null)
+        : 30;
+
     final exam = Exam(
       id: j['id']?.toString(),
       name: j['name']?.toString() ?? 'Untitled Exam',
@@ -120,7 +130,7 @@ class Exam {
       provider: j['provider']?.toString() ?? '',
       code: j['code']?.toString() ?? '',
       passingPercentage: (j['passingPercentage'] as num?)?.toInt() ?? 75,
-      defaultDuration: (j['defaultDuration'] as num?)?.toInt() ?? 30,
+      defaultDuration: duration,
       createdAt: parsedCreated,
       updatedAt: parsedUpdated,
       schemaVersion: (j['schemaVersion'] as num?)?.toInt() ?? 1,

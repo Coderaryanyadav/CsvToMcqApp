@@ -16,6 +16,7 @@ class ExamPerformance {
 
   final String? studentId;
   final String? studentName;
+  final Map<String, Map<String, dynamic>> questionSnapshots;
 
   ExamPerformance({
     this.examId = '',
@@ -36,6 +37,7 @@ class ExamPerformance {
     this.passingPercentage = 75,
     this.topicPerformance = const {},
     this.difficultyPerformance = const {},
+    this.questionSnapshots = const {},
   })  : date = date ?? DateTime.now(),
         totalQuestions = totalQuestions ??
             (total ?? (correct + (incorrect ?? 0) + unanswered)),
@@ -64,6 +66,7 @@ class ExamPerformance {
         'passingPercentage': passingPercentage,
         'topicPerformance': topicPerformance,
         'difficultyPerformance': difficultyPerformance,
+        'questionSnapshots': questionSnapshots,
       };
 
   factory ExamPerformance.fromJson(Map<String, dynamic> j) {
@@ -88,6 +91,15 @@ class ExamPerformance {
             'correct': (v['correct'] as num?)?.toInt() ?? 0,
             'total': (v['total'] as num?)?.toInt() ?? 0,
           };
+        }
+      });
+    }
+
+    final Map<String, Map<String, dynamic>> snapshots = {};
+    if (j['questionSnapshots'] != null && j['questionSnapshots'] is Map) {
+      (j['questionSnapshots'] as Map).forEach((k, v) {
+        if (v is Map) {
+          snapshots[k.toString()] = Map<String, dynamic>.from(v);
         }
       });
     }
@@ -119,6 +131,7 @@ class ExamPerformance {
       passingPercentage: (j['passingPercentage'] as num?)?.toInt() ?? 75,
       topicPerformance: topicPerf,
       difficultyPerformance: diffPerf,
+      questionSnapshots: snapshots,
     );
   }
 }
