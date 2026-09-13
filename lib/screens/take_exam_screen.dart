@@ -450,7 +450,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                color: isDark ? Colors.white : Colors.black87,
+                                color: isDark ? Colors.white : AppTheme.primaryNavy,
                               ),
                             ),
                             Row(
@@ -459,15 +459,24 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                 InkWell(
                                   onTap: () => _toggleAllQuestionTypes(true),
                                   borderRadius: BorderRadius.circular(6),
-                                  child: const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 4),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: isAllQuestionTypes
+                                          ? AppTheme.accentBlue
+                                              .withValues(alpha: 0.1)
+                                          : Colors.transparent,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
                                     child: Text(
                                       'Select All',
                                       style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w600,
-                                        color: AppTheme.accentBlue,
+                                        color: isAllQuestionTypes
+                                            ? AppTheme.accentBlue
+                                            : AppTheme.secondaryText,
                                       ),
                                     ),
                                   ),
@@ -480,7 +489,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                   borderRadius: BorderRadius.circular(6),
                                   child: const Padding(
                                     padding: EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 4),
+                                        horizontal: 8, vertical: 4),
                                     child: Text(
                                       'Clear',
                                       style: TextStyle(
@@ -508,7 +517,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                 horizontal: 14, vertical: 12),
                             decoration: BoxDecoration(
                               color: isAllQuestionTypes
-                                  ? AppTheme.accentBlue.withValues(alpha: 0.08)
+                                  ? (isDark
+                                      ? AppTheme.accentBlue
+                                          .withValues(alpha: 0.15)
+                                      : const Color(0xFFEFF6FF))
                                   : (isDark
                                       ? AppTheme.darkSurface
                                       : Colors.grey.shade50),
@@ -529,12 +541,18 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                   decoration: BoxDecoration(
                                     color: isAllQuestionTypes
                                         ? AppTheme.accentBlue
-                                        : Colors.grey.shade300,
+                                        : (isDark
+                                            ? AppTheme.darkBorder
+                                            : Colors.grey.shade200),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.auto_awesome_rounded,
-                                    color: Colors.white,
+                                    color: isAllQuestionTypes
+                                        ? Colors.white
+                                        : (isDark
+                                            ? Colors.grey.shade400
+                                            : Colors.grey.shade600),
                                     size: 18,
                                   ),
                                 ),
@@ -544,18 +562,23 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'All Question Types',
                                         style: TextStyle(
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
+                                          color: isDark
+                                              ? Colors.white
+                                              : AppTheme.text,
                                         ),
                                       ),
                                       Text(
                                         'Include all ${avail.totalAvailable} questions in this track',
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
-                                          color: AppTheme.secondaryText,
+                                          color: isDark
+                                              ? AppTheme.darkSecondaryText
+                                              : AppTheme.secondaryText,
                                         ),
                                       ),
                                     ],
@@ -563,13 +586,15 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                 ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                                      horizontal: 9, vertical: 3),
                                   decoration: BoxDecoration(
                                     color: isAllQuestionTypes
                                         ? AppTheme.accentBlue
                                             .withValues(alpha: 0.15)
-                                        : Colors.grey.shade200,
-                                    borderRadius: BorderRadius.circular(12),
+                                        : (isDark
+                                            ? AppTheme.darkBorder
+                                            : Colors.grey.shade200),
+                                    borderRadius: BorderRadius.circular(10),
                                   ),
                                   child: Text(
                                     '${avail.totalAvailable} Qs',
@@ -578,18 +603,22 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                       fontWeight: FontWeight.bold,
                                       color: isAllQuestionTypes
                                           ? AppTheme.accentBlue
-                                          : AppTheme.secondaryText,
+                                          : (isDark
+                                              ? AppTheme.darkSecondaryText
+                                              : AppTheme.secondaryText),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
+                                const SizedBox(width: 10),
                                 Icon(
                                   isAllQuestionTypes
                                       ? Icons.check_circle_rounded
-                                      : Icons.radio_button_unchecked,
+                                      : Icons.radio_button_unchecked_rounded,
                                   color: isAllQuestionTypes
                                       ? AppTheme.accentBlue
-                                      : Colors.grey,
+                                      : (isDark
+                                          ? Colors.grey.shade600
+                                          : Colors.grey.shade400),
                                   size: 22,
                                 ),
                               ],
@@ -602,48 +631,76 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         // Individual Question Type Rows/Cards
                         ...availableQuestionTypes.map((typeInfo) {
                           final count = avail.getCountForType(typeInfo.id);
-                          final isSelected = isAllQuestionTypes ||
+                          final isTypeChecked =
                               selectedQuestionTypes.contains(typeInfo.id);
+                          final isExplicitlySelected =
+                              !isAllQuestionTypes && isTypeChecked;
                           final isMulti = typeInfo.id ==
                                   QuestionTypeHelper.typeMultiple ||
                               typeInfo.id == 'multi' ||
                               typeInfo.id == 'multiple';
 
-                          Color iconBg = isMulti
-                              ? const Color(0xFFF3E8FF)
-                              : const Color(0xFFDBEAFE);
-                          Color iconColor = isMulti
+                          // Color schemes tailored to each question type
+                          final Color accentColor = isMulti
                               ? const Color(0xFF7C3AED)
                               : AppTheme.accentBlue;
+                          final Color iconBg = isDark
+                              ? (isTypeChecked
+                                  ? accentColor.withValues(alpha: 0.25)
+                                  : AppTheme.darkBorder)
+                              : (isTypeChecked
+                                  ? (isMulti
+                                      ? const Color(0xFFF3E8FF)
+                                      : const Color(0xFFDBEAFE))
+                                  : Colors.grey.shade100);
+                          final Color iconColor = isTypeChecked
+                              ? accentColor
+                              : (isDark
+                                  ? Colors.grey.shade500
+                                  : Colors.grey.shade400);
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: InkWell(
                               onTap: () {
-                                _toggleQuestionType(typeInfo.id, !isSelected);
+                                if (isAllQuestionTypes) {
+                                  // Direct toggle from "All": user targets only this format
+                                  setState(() {
+                                    isAllQuestionTypes = false;
+                                    selectedQuestionTypes = {typeInfo.id};
+                                  });
+                                } else {
+                                  _toggleQuestionType(
+                                      typeInfo.id, !isTypeChecked);
+                                }
                               },
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(12),
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 12, vertical: 10),
+                                    horizontal: 14, vertical: 11),
                                 decoration: BoxDecoration(
-                                  color: isSelected
+                                  color: isExplicitlySelected
                                       ? (isDark
-                                          ? AppTheme.accentBlue
-                                              .withValues(alpha: 0.12)
-                                          : const Color(0xFFF8FAFC))
-                                      : (isDark
-                                          ? AppTheme.darkSurface
-                                          : Colors.white),
-                                  borderRadius: BorderRadius.circular(10),
+                                          ? accentColor.withValues(alpha: 0.12)
+                                          : (isMulti
+                                              ? const Color(0xFFFAF5FF)
+                                              : const Color(0xFFEFF6FF)))
+                                      : (isAllQuestionTypes && isTypeChecked
+                                          ? (isDark
+                                              ? AppTheme.darkSurface
+                                              : Colors.white)
+                                          : (isDark
+                                              ? AppTheme.darkSurface
+                                              : Colors.grey.shade50)),
+                                  borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isSelected
-                                        ? AppTheme.accentBlue
+                                    color: isExplicitlySelected
+                                        ? accentColor
                                         : (isDark
                                             ? AppTheme.darkBorder
                                             : AppTheme.border),
-                                    width: isSelected ? 1.5 : 1,
+                                    width: isExplicitlySelected ? 1.5 : 1,
                                   ),
                                 ),
                                 child: Row(
@@ -657,63 +714,69 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                       child: Icon(
                                         typeInfo.icon,
                                         color: iconColor,
-                                        size: 17,
+                                        size: 18,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
                                     Expanded(
-                                      child: Row(
-                                        children: [
-                                          Text(
-                                            typeInfo.displayName,
-                                            style: TextStyle(
-                                              fontWeight: isSelected
-                                                  ? FontWeight.bold
-                                                  : FontWeight.w500,
-                                              fontSize: 14,
-                                              color: isDark
+                                      child: Text(
+                                        typeInfo.displayName,
+                                        style: TextStyle(
+                                          fontWeight: isTypeChecked
+                                              ? FontWeight.w600
+                                              : FontWeight.normal,
+                                          fontSize: 14,
+                                          color: isTypeChecked
+                                              ? (isDark
                                                   ? Colors.white
-                                                  : AppTheme.text,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 7, vertical: 2),
-                                            decoration: BoxDecoration(
-                                              color: isSelected
-                                                  ? (isMulti
-                                                      ? const Color(0xFFEDE9FE)
-                                                      : const Color(0xFFE0F2FE))
-                                                  : Colors.grey.shade100,
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                            ),
-                                            child: Text(
-                                              '$count Questions',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                fontWeight: FontWeight.w600,
-                                                color: isSelected
-                                                    ? (isMulti
-                                                        ? const Color(
-                                                            0xFF6D28D9)
-                                                        : const Color(
-                                                            0xFF0284C7))
-                                                    : AppTheme.secondaryText,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                                  : AppTheme.text)
+                                              : (isDark
+                                                  ? AppTheme.darkSecondaryText
+                                                  : AppTheme.secondaryText),
+                                        ),
                                       ),
                                     ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: isTypeChecked
+                                            ? (isDark
+                                                ? accentColor
+                                                    .withValues(alpha: 0.2)
+                                                : (isMulti
+                                                    ? const Color(0xFFEDE9FE)
+                                                    : const Color(0xFFE0F2FE)))
+                                            : (isDark
+                                                ? AppTheme.darkBorder
+                                                : Colors.grey.shade100),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        '$count Qs',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: isTypeChecked
+                                              ? accentColor
+                                              : (isDark
+                                                  ? AppTheme.darkSecondaryText
+                                                  : AppTheme.secondaryText),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
                                     Icon(
-                                      isSelected
+                                      isTypeChecked
                                           ? Icons.check_box_rounded
                                           : Icons.check_box_outline_blank_rounded,
-                                      color: isSelected
-                                          ? AppTheme.accentBlue
-                                          : Colors.grey.shade400,
+                                      color: isTypeChecked
+                                          ? (isExplicitlySelected
+                                              ? accentColor
+                                              : AppTheme.accentBlue)
+                                          : (isDark
+                                              ? Colors.grey.shade600
+                                              : Colors.grey.shade400),
                                       size: 22,
                                     ),
                                   ],
@@ -990,89 +1053,139 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 const SizedBox(height: 24),
 
                 // 6. FILTERS & OPTIONS
-                _sectionTitle('6. Filters & Options', Icons.tune),
+                _sectionTitle('6. Filters & Options', Icons.tune_rounded),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Topic Dropdown
-                        Row(
-                          children: [
-                            const Text('Topic:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: DropdownButton<String>(
-                                isExpanded: true,
-                                value: selectedTopic,
-                                underline: const SizedBox(),
-                                items: availableTopics.map((t) {
-                                  return DropdownMenuItem(
-                                      value: t, child: Text(t));
-                                }).toList(),
-                                onChanged: (v) {
-                                  if (v != null) {
-                                    setState(() => selectedTopic = v);
-                                  }
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-
-                        // Difficulty
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8.0),
-                              child: Text('Difficulty:',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.bold, fontSize: 14)),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 6,
-                                children:
-                                    ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
-                                  final isSel = selectedDifficulty == d;
-                                  return ChoiceChip(
-                                    label: Text(d),
-                                    selected: isSel,
-                                    onSelected: (v) {
-                                      if (v) {
-                                        setState(() => selectedDifficulty = d);
-                                      }
-                                    },
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const Divider(height: 20),
-
-                        // Switches
-                        SwitchListTile(
-                          contentPadding: EdgeInsets.zero,
-                          secondary: Icon(
-                            onlyStarred
-                                ? Icons.star_rounded
-                                : Icons.star_outline_rounded,
-                            color: onlyStarred
-                                ? Colors.amber.shade700
+                        Text(
+                          'Topic / Category',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark
+                                ? AppTheme.darkSecondaryText
                                 : AppTheme.secondaryText,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppTheme.darkSurface
+                                : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.border,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: selectedTopic,
+                              icon: const Icon(Icons.arrow_drop_down_rounded,
+                                  color: AppTheme.secondaryText),
+                              items: availableTopics.map((t) {
+                                return DropdownMenuItem(
+                                  value: t,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.topic_outlined,
+                                          size: 18,
+                                          color: AppTheme.secondaryText),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          t,
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setState(() => selectedTopic = v);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Difficulty Selection
+                        Text(
+                          'Difficulty Level',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark
+                                ? AppTheme.darkSecondaryText
+                                : AppTheme.secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children:
+                              ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
+                            final isSel = selectedDifficulty == d;
+                            return ChoiceChip(
+                              label: Text(d),
+                              selected: isSel,
+                              onSelected: (v) {
+                                if (v) {
+                                  setState(() => selectedDifficulty = d);
+                                }
+                              },
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 16),
+                        const Divider(height: 1),
+                        const SizedBox(height: 4),
+
+                        // Starred Questions (Revision Mode)
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          secondary: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: onlyStarred
+                                  ? Colors.amber.shade100
+                                  : (isDark
+                                      ? AppTheme.darkBorder
+                                      : Colors.grey.shade100),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              onlyStarred
+                                  ? Icons.star_rounded
+                                  : Icons.star_outline_rounded,
+                              color: onlyStarred
+                                  ? Colors.amber.shade800
+                                  : AppTheme.secondaryText,
+                              size: 18,
+                            ),
+                          ),
                           title: const Text(
-                              '⭐ Starred Questions Only (Revision Mode)',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
+                            'Starred Questions Only',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
                           subtitle: Text(
-                              'Target $_starredQuestionsCount starred question(s) in "${selectedExam?.name ?? 'Exam'}"'),
+                            'Target $_starredQuestionsCount starred question(s) in "${selectedExam?.name ?? 'Exam'}"',
+                            style: const TextStyle(fontSize: 12),
+                          ),
                           value: onlyStarred,
                           onChanged: (v) {
                             setState(() {
@@ -1083,22 +1196,72 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                             });
                           },
                         ),
-                        const Divider(height: 12),
+                        const Divider(height: 1),
+                        // Shuffle Questions
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Shuffle Questions',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
-                          subtitle: const Text('Randomize question sequence'),
+                          secondary: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: shuffleQuestions
+                                  ? AppTheme.accentBlue.withValues(alpha: 0.12)
+                                  : (isDark
+                                      ? AppTheme.darkBorder
+                                      : Colors.grey.shade100),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.shuffle_rounded,
+                              color: shuffleQuestions
+                                  ? AppTheme.accentBlue
+                                  : AppTheme.secondaryText,
+                              size: 18,
+                            ),
+                          ),
+                          title: const Text(
+                            'Shuffle Questions',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
+                          subtitle: const Text(
+                            'Randomize question sequence',
+                            style: TextStyle(fontSize: 12),
+                          ),
                           value: shuffleQuestions,
                           onChanged: (v) =>
                               setState(() => shuffleQuestions = v),
                         ),
+                        const Divider(height: 1),
+                        // Shuffle Options
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: const Text('Shuffle Options (A/B/C/D)',
-                              style: TextStyle(fontWeight: FontWeight.w600)),
+                          secondary: Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: shuffleOptions
+                                  ? const Color(0xFFEDE9FE)
+                                  : (isDark
+                                      ? AppTheme.darkBorder
+                                      : Colors.grey.shade100),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              Icons.alt_route_rounded,
+                              color: shuffleOptions
+                                  ? const Color(0xFF7C3AED)
+                                  : AppTheme.secondaryText,
+                              size: 18,
+                            ),
+                          ),
+                          title: const Text(
+                            'Shuffle Answer Options',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14),
+                          ),
                           subtitle: const Text(
-                              'Randomize option order for each question'),
+                            'Randomize choice order (A/B/C/D) for each question',
+                            style: TextStyle(fontSize: 12),
+                          ),
                           value: shuffleOptions,
                           onChanged: (v) => setState(() => shuffleOptions = v),
                         ),
