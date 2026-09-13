@@ -20,6 +20,7 @@ It combines a multi-student profile system, safe atomic local persistence, resil
 
 ## 🚀 Key Features
 
+* **🎯 Question-Type Selection & Filtering**: Explicitly choose which question types to practice or include in exam simulations (e.g. *Single Choice Only*, *Multiple Choice / Multiple Select Only*, *True/False*, or *All Types*). Real-time availability badges instantly reflect matching questions.
 * **👥 Multi-Student Profiles & Data Isolation**: Create separate student profiles with custom avatar emojis and colors. Statistics, attempt histories, bookmarks, and sessions are isolated per active student.
 * **📂 Flexible CSV & Excel (XLSX) Import**: Intelligent header alias normalization (`question_text`, `choice_1`–`4`, `correct_answer`, `explanation_a`–`d`, etc.) with duplicate detection and an interactive validation preview.
 * **⏱️ Exam Simulator**: Timed and untimed exams, question navigation grid, flag for review, auto-submit on timer expiration, and lifecycle auto-saving (`WidgetsBindingObserver`).
@@ -142,20 +143,32 @@ flutter test
 
 ---
 
-## 📦 Building for Release
+## 📦 Building for Release & Deployment
 
+### 🤖 Android (Google Play Store & Sideload APK)
 ```bash
-# Android APK
+# 1. Google Play Store Release (AAB)
+flutter build appbundle --release
+# Output: build/app/outputs/bundle/release/app-release.aab
+
+# 2. Universal Sideload APK
 flutter build apk --release
-
-# macOS Desktop
-flutter build macos --release
-
-# iOS Bundle
-flutter build ipa --release
+# Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-For detailed release instructions, see [docs/releasing.md](docs/releasing.md).
+### 🍏 macOS Desktop
+```bash
+flutter build macos --release
+# Output: build/macos/Build/Products/Release/csv_to_mcq_app.app
+```
+
+### 📱 iOS
+```bash
+flutter build ipa --release
+# Output: build/ios/ipa/*.ipa
+```
+
+For detailed release checklists and deployment instructions, see [docs/releasing.md](docs/releasing.md).
 
 ---
 

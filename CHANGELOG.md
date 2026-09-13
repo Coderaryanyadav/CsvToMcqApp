@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-09-13
+
+### Added
+- **Question-Type Selection & Filtering**: Added granular question-type filtering (`Single Choice`, `Multiple Choice`, `True/False`, and dynamically discovered custom types) for both Practice and Exam sessions.
+- **Dynamic Availability Engine**: Real-time counter chips indicating available question counts matching active topic, difficulty, starred, and type criteria.
+- **Selective Shuffling Logic**: Decoupled sequence randomization and option shuffling from question filtering, preserving option explanations and correct answer keys.
+- **Unit & Widget Test Coverage**: Expanded test suite to 78+ passing tests including `QuestionSelectionService` verification and interactive chip widget tests.
+
 ## [1.0.0] - 2026-09-08
 
 ### Added
