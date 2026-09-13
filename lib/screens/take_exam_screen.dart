@@ -823,26 +823,33 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
                         // Difficulty
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Difficulty:',
-                                style: TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 14)),
+                            const Padding(
+                              padding: EdgeInsets.only(top: 8.0),
+                              child: Text('Difficulty:',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.bold, fontSize: 14)),
+                            ),
                             const SizedBox(width: 16),
-                            Wrap(
-                              spacing: 8,
-                              children:
-                                  ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
-                                final isSel = selectedDifficulty == d;
-                                return ChoiceChip(
-                                  label: Text(d),
-                                  selected: isSel,
-                                  onSelected: (v) {
-                                    if (v) {
-                                      setState(() => selectedDifficulty = d);
-                                    }
-                                  },
-                                );
-                              }).toList(),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 8,
+                                runSpacing: 6,
+                                children:
+                                    ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
+                                  final isSel = selectedDifficulty == d;
+                                  return ChoiceChip(
+                                    label: Text(d),
+                                    selected: isSel,
+                                    onSelected: (v) {
+                                      if (v) {
+                                        setState(() => selectedDifficulty = d);
+                                      }
+                                    },
+                                  );
+                                }).toList(),
+                              ),
                             ),
                           ],
                         ),
