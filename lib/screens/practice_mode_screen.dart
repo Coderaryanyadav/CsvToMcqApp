@@ -468,18 +468,20 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
     final isLast = current == widget.questions.length - 1;
     final isMultiple = q.isMultiple;
     final isRevealed = _revealed[current] == true;
+    final isStarred = _bookmarkedIds.contains(q.id);
     final selected = _answers[current] ?? <int>{};
     final questionsLeft = widget.questions.length - current - 1;
     final progress = (current + 1) / widget.questions.length;
 
-    final isStarred = _bookmarkedIds.contains(q.id);
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
 
     return KeyboardListener(
       focusNode: _focusNode,
       autofocus: true,
       onKeyEvent: _handleKeyEvent,
       child: Scaffold(
-        backgroundColor: AppTheme.background,
+        backgroundColor: theme.scaffoldBackgroundColor,
         appBar: AppBar(
           title: Text(widget.examName != null
               ? '${widget.examName} — Practice'
@@ -488,7 +490,8 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
         body: Column(
           children: [
             Container(
-              color: Colors.white,
+              color: theme.cardTheme.color ??
+                  (isDark ? AppTheme.darkSurface : Colors.white),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Column(
                 children: [
@@ -699,31 +702,45 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
                           final isOptionCorrect = q.correctAnswers.contains(i);
                           final exp = q.getExplanation(i);
 
-                          Color cardBg = Colors.white;
-                          Color borderColor = AppTheme.border;
+                          Color cardBg =
+                              isDark ? AppTheme.darkSurface : Colors.white;
+                          Color borderColor =
+                              isDark ? AppTheme.darkBorder : AppTheme.border;
                           Widget? statusIcon;
 
                           if (isRevealed) {
                             if (isOptionCorrect) {
-                              cardBg = const Color(0xFFF0FDF4);
+                              cardBg = isDark
+                                  ? const Color(0xFF14532D)
+                                      .withValues(alpha: 0.3)
+                                  : const Color(0xFFF0FDF4);
                               borderColor = const Color(0xFF86EFAC);
                               statusIcon = const Icon(Icons.check_circle,
                                   color: AppTheme.success, size: 20);
                             } else if (isOptionSelected && !isOptionCorrect) {
-                              cardBg = const Color(0xFFFEF2F2);
+                              cardBg = isDark
+                                  ? const Color(0xFF7F1D1D)
+                                      .withValues(alpha: 0.3)
+                                  : const Color(0xFFFEF2F2);
                               borderColor = const Color(0xFFFCA5A5);
                               statusIcon = const Icon(Icons.cancel,
                                   color: AppTheme.danger, size: 20);
                             } else {
-                              cardBg = const Color(0xFFF9FAFB);
-                              borderColor = const Color(0xFFE5E7EB);
+                              cardBg = isDark
+                                  ? AppTheme.darkSurface
+                                  : const Color(0xFFF9FAFB);
+                              borderColor = isDark
+                                  ? AppTheme.darkBorder
+                                  : const Color(0xFFE5E7EB);
                               statusIcon = const Icon(
                                   Icons.remove_circle_outline,
                                   color: Color(0xFF9CA3AF),
                                   size: 20);
                             }
                           } else if (isOptionSelected) {
-                            cardBg = const Color(0xFFEBF2FA);
+                            cardBg = isDark
+                                ? AppTheme.accentBlue.withValues(alpha: 0.2)
+                                : const Color(0xFFEBF2FA);
                             borderColor = AppTheme.accentBlue;
                           }
 
@@ -902,9 +919,14 @@ class _PracticeModeScreenState extends State<PracticeModeScreen> {
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                border: Border(top: BorderSide(color: AppTheme.border)),
+              decoration: BoxDecoration(
+                color: theme.cardTheme.color ??
+                    (isDark ? AppTheme.darkSurface : Colors.white),
+                border: Border(
+                  top: BorderSide(
+                    color: isDark ? AppTheme.darkBorder : AppTheme.border,
+                  ),
+                ),
               ),
               child: Center(
                 child: ConstrainedBox(

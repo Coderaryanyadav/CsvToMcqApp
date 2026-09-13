@@ -1,4 +1,4 @@
-package com.example.mcq_app_final
+package com.coderaryanyadav.csvquizapp
 
 import io.flutter.embedding.android.FlutterActivity
 

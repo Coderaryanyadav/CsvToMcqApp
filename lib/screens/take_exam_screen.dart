@@ -1,7 +1,7 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/exam.dart';
 import '../models/question.dart';
+import '../services/question_selection_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'exam_screen.dart';
@@ -30,16 +30,28 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   bool isPracticeMode = true;
   bool onlyStarred = false;
   Set<String> _bookmarkedIds = {};
+
+  // Question Types selection state
+  bool isAllQuestionTypes = true;
+  Set<String> selectedQuestionTypes = {};
+  List<QuestionTypeInfo> availableQuestionTypes = [];
+
+  // Question count state
   int selectedQuestionCount = 20;
   bool isAllQuestions = false;
   bool isCustomCount = false;
+
+  // Duration state
   int selectedDurationMin = 30; // 0 = Untimed
   bool isCustomDuration = false;
+
+  // Shuffle & filters state
   bool shuffleQuestions = true;
   bool shuffleOptions = false;
   String selectedDifficulty = 'Any';
   String selectedTopic = 'All Topics';
   List<String> availableTopics = ['All Topics'];
+
   final TextEditingController _customCountCtrl = TextEditingController();
   final TextEditingController _customDurationCtrl = TextEditingController();
 
@@ -85,6 +97,13 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
 
   void _initExamData() {
     if (selectedExam == null) return;
+
+    // Discover supported question types in the selected exam
+    availableQuestionTypes =
+        QuestionTypeHelper.discoverTypes(selectedExam!.questions);
+    isAllQuestionTypes = true;
+    selectedQuestionTypes = availableQuestionTypes.map((t) => t.id).toSet();
+
     final totalQ = selectedExam!.questions.length;
     if (totalQ < 20) {
       selectedQuestionCount = totalQ > 0 ? totalQ : 10;
@@ -107,33 +126,36 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     selectedTopic = 'All Topics';
   }
 
-  int get _starredQuestionsCount {
-    if (selectedExam == null) return 0;
-    return selectedExam!.questions
-        .where((q) => _bookmarkedIds.contains(q.id))
-        .length;
+  QuestionAvailability get _availability {
+    if (selectedExam == null) {
+      return const QuestionAvailability(
+        totalAvailable: 0,
+        countsByType: {},
+        totalStarred: 0,
+      );
+    }
+    return QuestionSelectionService.getAvailability(
+      questions: selectedExam!.questions,
+      selectedTopic: selectedTopic,
+      selectedDifficulty: selectedDifficulty,
+      onlyStarred: onlyStarred,
+      bookmarkedIds: _bookmarkedIds,
+    );
   }
+
+  int get _starredQuestionsCount => _availability.totalStarred;
 
   int get _availableQuestionsCount {
     if (selectedExam == null) return 0;
-    var list = List<Question>.from(selectedExam!.questions);
-    if (onlyStarred) {
-      list = list.where((q) => _bookmarkedIds.contains(q.id)).toList();
+    final avail = _availability;
+    if (isAllQuestionTypes) {
+      return avail.totalAvailable;
     }
-    if (selectedTopic != 'All Topics') {
-      list = list.where((q) => q.topic == selectedTopic).toList();
+    int count = 0;
+    for (final typeId in selectedQuestionTypes) {
+      count += avail.getCountForType(typeId);
     }
-    if (selectedDifficulty != 'Any') {
-      if (selectedDifficulty == 'Easy') {
-        list = list.where((q) => q.difficulty <= 2).toList();
-      } else if (selectedDifficulty == 'Medium') {
-        list =
-            list.where((q) => q.difficulty == 3 || q.difficulty == 4).toList();
-      } else if (selectedDifficulty == 'Hard') {
-        list = list.where((q) => q.difficulty == 5).toList();
-      }
-    }
-    return list.length;
+    return count;
   }
 
   int get _effectiveQuestionCount {
@@ -146,83 +168,32 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   }
 
   String? get _questionCountError {
-    final available = _availableQuestionsCount;
-    if (available == 0) {
-      if (onlyStarred) {
-        return 'No starred / bookmarked questions found in "${selectedExam?.name ?? 'Exam'}". Star questions during practice or in the Question Bank first.';
-      }
-      return 'No questions available in "${selectedExam?.name ?? 'Exam'}" with current filters.';
-    }
-    final requested = _effectiveQuestionCount;
-    if (requested <= 0) {
-      return 'Please enter a question count greater than 0.';
-    }
-    if (requested > available) {
-      return 'Cannot select $requested questions! Only $available questions exist in this exam track/filter.';
-    }
-    return null;
+    return QuestionSelectionService.validateSelection(
+      availableCount: _availableQuestionsCount,
+      requestedCount: _effectiveQuestionCount,
+      selectedQuestionTypes: selectedQuestionTypes,
+      isAllQuestionTypes: isAllQuestionTypes,
+      allAvailableTypes: availableQuestionTypes,
+      onlyStarred: onlyStarred,
+      examName: selectedExam?.name,
+    );
   }
 
   List<Question> _getFilteredQuestions() {
     if (selectedExam == null) return [];
-    var questions = List<Question>.from(selectedExam!.questions);
-
-    if (onlyStarred) {
-      questions.retainWhere((q) => _bookmarkedIds.contains(q.id));
-    }
-
-    if (selectedTopic != 'All Topics') {
-      questions.retainWhere((q) => q.topic == selectedTopic);
-    }
-
-    if (selectedDifficulty != 'Any') {
-      if (selectedDifficulty == 'Easy') {
-        questions.retainWhere((q) => q.difficulty <= 2);
-      } else if (selectedDifficulty == 'Medium') {
-        questions.retainWhere((q) => q.difficulty == 3 || q.difficulty == 4);
-      } else if (selectedDifficulty == 'Hard') {
-        questions.retainWhere((q) => q.difficulty == 5);
-      }
-    }
-
-    if (shuffleQuestions) {
-      questions.shuffle();
-    }
-
-    if (shuffleOptions) {
-      // Create copies with shuffled options
-      questions = questions.map((origQ) {
-        final originalCorrectOptions =
-            origQ.correctAnswers.map((idx) => origQ.options[idx]).toSet();
-        final optionsCopy = List<String>.from(origQ.options)..shuffle();
-        final newCorrectAnswers = <int>{};
-        final newExplanations = <int, String>{};
-
-        for (int i = 0; i < optionsCopy.length; i++) {
-          if (originalCorrectOptions.contains(optionsCopy[i])) {
-            newCorrectAnswers.add(i);
-          }
-          final oldIdx = origQ.options.indexOf(optionsCopy[i]);
-          if (oldIdx != -1 && origQ.optionExplanations.containsKey(oldIdx)) {
-            newExplanations[i] = origQ.optionExplanations[oldIdx]!;
-          }
-        }
-
-        return origQ.copyWith(
-          options: optionsCopy,
-          correctAnswers: newCorrectAnswers,
-          optionExplanations: newExplanations,
-        );
-      }).toList();
-    }
-
-    if (isAllQuestions) {
-      return questions;
-    }
-
-    final maxAvail = questions.length;
-    final count = min(selectedQuestionCount, maxAvail);
-    return questions.take(max(1, count)).toList();
+    return QuestionSelectionService.filterQuestions(
+      questions: selectedExam!.questions,
+      selectedQuestionTypes: selectedQuestionTypes,
+      isAllQuestionTypes: isAllQuestionTypes,
+      selectedTopic: selectedTopic,
+      selectedDifficulty: selectedDifficulty,
+      onlyStarred: onlyStarred,
+      bookmarkedIds: _bookmarkedIds,
+      shuffleQuestions: shuffleQuestions,
+      shuffleOptions: shuffleOptions,
+      count: isAllQuestions ? null : _effectiveQuestionCount,
+      isAllQuestions: isAllQuestions,
+    );
   }
 
   void _startSession() {
@@ -235,8 +206,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Please enter a valid number of questions.'),
-              backgroundColor: AppTheme.danger),
+            content: Text('Please enter a valid number of questions.'),
+            backgroundColor: AppTheme.danger,
+          ),
         );
         return;
       }
@@ -249,9 +221,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text(
-                  'Please enter a valid duration in minutes (0 for untimed).'),
-              backgroundColor: AppTheme.danger),
+            content: Text(
+                'Please enter a valid duration in minutes (0 for untimed).'),
+            backgroundColor: AppTheme.danger,
+          ),
         );
         return;
       }
@@ -308,6 +281,32 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     }
   }
 
+  void _toggleAllQuestionTypes(bool selectAll) {
+    setState(() {
+      if (selectAll) {
+        isAllQuestionTypes = true;
+        selectedQuestionTypes = availableQuestionTypes.map((t) => t.id).toSet();
+      } else {
+        isAllQuestionTypes = false;
+        selectedQuestionTypes = {};
+      }
+    });
+  }
+
+  void _toggleQuestionType(String typeId, bool isSelected) {
+    setState(() {
+      if (isSelected) {
+        selectedQuestionTypes.add(typeId);
+        if (selectedQuestionTypes.length == availableQuestionTypes.length) {
+          isAllQuestionTypes = true;
+        }
+      } else {
+        selectedQuestionTypes.remove(typeId);
+        isAllQuestionTypes = false;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -340,6 +339,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
         ),
       );
     }
+
+    final avail = _availability;
 
     return Scaffold(
       appBar: AppBar(
@@ -430,10 +431,137 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 3. QUESTIONS COUNT
+                // 3. QUESTION TYPES SELECTION
                 _sectionTitle(
-                    '3. Number of Questions ($_availableQuestionsCount Available)',
-                    Icons.format_list_numbered),
+                  '3. Question Types ($_availableQuestionsCount Available)',
+                  Icons.category_outlined,
+                ),
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 8,
+                          runSpacing: 4,
+                          children: [
+                            Text(
+                              'Select Allowed Question Types',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isDark ? Colors.white : Colors.black87,
+                              ),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                TextButton(
+                                  onPressed: () =>
+                                      _toggleAllQuestionTypes(true),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                  ),
+                                  child: const Text('Select All'),
+                                ),
+                                const Text('•',
+                                    style: TextStyle(
+                                        color: AppTheme.secondaryText)),
+                                TextButton(
+                                  onPressed: () =>
+                                      _toggleAllQuestionTypes(false),
+                                  style: TextButton.styleFrom(
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                  ),
+                                  child: const Text('Clear Selection'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            // "All Question Types" master chip
+                            FilterChip(
+                              label: Text(
+                                  'All Question Types (${avail.totalAvailable})'),
+                              selected: isAllQuestionTypes,
+                              avatar: Icon(
+                                isAllQuestionTypes
+                                    ? Icons.check_circle_rounded
+                                    : Icons.circle_outlined,
+                                size: 18,
+                              ),
+                              onSelected: (v) => _toggleAllQuestionTypes(v),
+                            ),
+                            // Individual types
+                            ...availableQuestionTypes.map((typeInfo) {
+                              final count = avail.getCountForType(typeInfo.id);
+                              final isSelected = isAllQuestionTypes ||
+                                  selectedQuestionTypes.contains(typeInfo.id);
+
+                              return FilterChip(
+                                avatar: Icon(typeInfo.icon, size: 18),
+                                label: Text('${typeInfo.displayName} ($count)'),
+                                selected: isSelected,
+                                onSelected: (v) {
+                                  _toggleQuestionType(typeInfo.id, v);
+                                },
+                              );
+                            }),
+                          ],
+                        ),
+                        if (!isAllQuestionTypes &&
+                            selectedQuestionTypes.isEmpty) ...[
+                          const SizedBox(height: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.orange.shade300),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded,
+                                    size: 20, color: Colors.orange.shade800),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Please select at least one question type to start.',
+                                    style: TextStyle(
+                                      color: Colors.brown,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+
+                // 4. NUMBER OF QUESTIONS
+                _sectionTitle(
+                  '4. Number of Questions ($_availableQuestionsCount Available)',
+                  Icons.format_list_numbered,
+                ),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -515,27 +643,77 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                           const SizedBox(height: 12),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
+                                horizontal: 12, vertical: 10),
                             decoration: BoxDecoration(
                               color: Colors.red.shade50,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: Colors.red.shade300),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(Icons.error_outline,
-                                    size: 20, color: Colors.red.shade700),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _questionCountError!,
-                                    style: TextStyle(
-                                      color: Colors.red.shade900,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                Row(
+                                  children: [
+                                    Icon(Icons.error_outline,
+                                        size: 20, color: Colors.red.shade700),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        _questionCountError!,
+                                        style: TextStyle(
+                                          color: Colors.red.shade900,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                     ),
-                                  ),
+                                  ],
                                 ),
+                                if (_availableQuestionsCount > 0 &&
+                                    _effectiveQuestionCount >
+                                        _availableQuestionsCount) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () {
+                                          setState(() {
+                                            selectedQuestionCount =
+                                                _availableQuestionsCount;
+                                            _customCountCtrl.text =
+                                                '$_availableQuestionsCount';
+                                            isAllQuestions = false;
+                                          });
+                                        },
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.red.shade900,
+                                          side: BorderSide(
+                                              color: Colors.red.shade400),
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        icon: const Icon(Icons.tune, size: 16),
+                                        label: Text(
+                                            'Set to $_availableQuestionsCount Max'),
+                                      ),
+                                      if (!isAllQuestionTypes)
+                                        TextButton(
+                                          onPressed: () =>
+                                              _toggleAllQuestionTypes(true),
+                                          style: TextButton.styleFrom(
+                                            foregroundColor:
+                                                AppTheme.accentBlue,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                          child: const Text('Select All Types'),
+                                        ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -546,8 +724,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 4. DURATION SELECTION
-                _sectionTitle('4. Exam Duration', Icons.access_time),
+                // 5. DURATION SELECTION
+                _sectionTitle('5. Exam Duration', Icons.access_time),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -609,8 +787,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 5. FILTERS & OPTIONS
-                _sectionTitle('5. Filters & Options', Icons.tune),
+                // 6. FILTERS & OPTIONS
+                _sectionTitle('6. Filters & Options', Icons.tune),
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),

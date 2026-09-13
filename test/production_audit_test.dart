@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:csv_to_mcq_app/models/exam.dart';
+import 'package:csv_to_mcq_app/models/question.dart';
 import 'package:csv_to_mcq_app/models/performance.dart';
 import 'package:csv_to_mcq_app/models/student_profile.dart';
 import 'package:csv_to_mcq_app/services/analytics_service.dart';
@@ -282,6 +283,75 @@ void main() {
       final restored = Exam.fromJson(json);
       expect(restored.isUntimed, isTrue);
       expect(restored.defaultDuration, isNull);
+    });
+
+    test(
+        'Question model nullable copyWith allows clearing topic and explanation',
+        () {
+      final q = Question(
+        id: 'q1',
+        question: 'What is Dart?',
+        options: ['Lang', 'Framework'],
+        correctAnswers: {0},
+        topic: 'Programming',
+        optionExplanations: {0: 'A client-optimized language'},
+      );
+
+      expect(q.topic, 'Programming');
+      expect(q.explanation, 'A client-optimized language');
+
+      final cleared = q.copyWith(topic: null, optionExplanations: {});
+      expect(cleared.topic, isNull);
+      expect(cleared.explanation, isNull);
+      expect(cleared.question, 'What is Dart?');
+      expect(cleared.correctAnswers, {0});
+    });
+
+    test(
+        'Question.fromJson with missing correct answers does NOT inject fake correctness',
+        () {
+      final jsonMissingCorrect = {
+        'id': 'q_no_correct',
+        'question': 'Unanswered question?',
+        'options': ['Opt A', 'Opt B'],
+      };
+
+      final q = Question.fromJson(jsonMissingCorrect);
+      expect(q.correctAnswers, isEmpty);
+      expect(q.correct, -1);
+    });
+  });
+
+  group('P0: Clear All Data and Empty DB Safety', () {
+    test(
+        'clearAllData completely cleans students, active student, exams, and performances',
+        () async {
+      final student = StudentProfile(id: 'student_xyz', name: 'Test User');
+      await StorageService.saveStudent(student);
+      await StorageService.setActiveStudent(student);
+
+      final exam = Exam(id: 'exam_xyz', name: 'Test Exam');
+      await StorageService.saveExam(exam);
+
+      await StorageService.savePerformance(ExamPerformance(
+        examId: 'exam_xyz',
+        studentId: 'student_xyz',
+        studentName: 'Test User',
+        totalQuestions: 5,
+        correct: 5,
+      ));
+
+      // Verify active state
+      expect(await StorageService.getActiveStudent(), isNotNull);
+      expect((await StorageService.loadAllExams()).length, 1);
+
+      // Clear all
+      await StorageService.clearAllData();
+
+      expect(await StorageService.getActiveStudent(), isNull);
+      expect((await StorageService.loadAllExams()), isEmpty);
+      expect((await StorageService.getAllStudents()), isEmpty);
+      expect(StorageService.loadAllPerformances(), isEmpty);
     });
   });
 

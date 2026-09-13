@@ -433,22 +433,26 @@ class IoStorageRepository implements IStorageRepository {
   @override
   Future<void> clearAllData() async {
     await init();
-    _cachedExams = null;
-    _cachedPerformances = null;
-    _cachedStudents = null;
-    _cachedSettings = null;
+    _cachedExams = [];
+    _cachedPerformances = [];
+    _cachedStudents = [];
     _cachedBookmarks.clear();
 
     if (await mcqDir.exists()) {
       final list = await mcqDir.list().toList();
       for (final f in list) {
         try {
-          if (f is File && !f.path.endsWith('settings.json')) {
+          if (f is File) {
             await f.delete();
           }
         } catch (_) {}
       }
     }
+
+    final defaults = _defaultSettings();
+    _cachedSettings = Map<String, dynamic>.from(defaults);
+    final file = File('${mcqDir.path}/settings.json');
+    await _writeAtomic(file, jsonEncode(defaults));
   }
 
   @override

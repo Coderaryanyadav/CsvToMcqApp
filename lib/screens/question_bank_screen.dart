@@ -615,7 +615,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       questionToEdit.tags = tags;
                     } else {
                       final newQ = Question(
-                        id: 'Q${_selectedExam!.nextQuestionNumber}',
+                        id: const Uuid().v4(),
                         question: qText,
                         options: [oA, oB, oC, oD],
                         correctAnswers: correctAnswers,
@@ -628,6 +628,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                             : topicCtrl.text.trim(),
                         difficulty: difficulty,
                         tags: tags,
+                        displayNumber: _selectedExam!.nextQuestionNumber,
                       );
                       _selectedExam!.questions.add(newQ);
                     }
@@ -1338,8 +1339,12 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 : theme.colorScheme.outlineVariant,
                           ),
                         ),
-                        color:
-                            isStarred ? const Color(0xFFFFFDF5) : Colors.white,
+                        color: isStarred
+                            ? (theme.brightness == Brightness.dark
+                                ? const Color(0xFF292524)
+                                : const Color(0xFFFFFDF5))
+                            : (theme.cardTheme.color ??
+                                theme.colorScheme.surface),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
                           child: Column(

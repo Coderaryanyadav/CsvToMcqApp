@@ -15,6 +15,7 @@ import 'question_bank_screen.dart';
 import 'settings_screen.dart';
 import 'import_preview_screen.dart';
 import 'welcome_screen.dart';
+import '../widgets/banner_ad_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -522,6 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : _buildActiveTabContent(),
             ),
+            const BannerAdWidget(),
           ],
         ),
       ),

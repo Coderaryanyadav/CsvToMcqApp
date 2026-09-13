@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:csv_to_mcq_app/screens/home_screen.dart';
 import 'package:csv_to_mcq_app/screens/exam_screen.dart';
 import 'package:csv_to_mcq_app/screens/practice_mode_screen.dart';
+import 'package:csv_to_mcq_app/screens/take_exam_screen.dart';
 import 'package:csv_to_mcq_app/models/question.dart';
 import 'package:csv_to_mcq_app/models/exam.dart';
 
@@ -110,6 +111,59 @@ void main() {
     expect(find.text('SELECT is used to query and retrieve data.'),
         findsOneWidget);
     expect(find.text('INSERT adds new rows.'), findsOneWidget);
+  });
+
+  testWidgets('TakeExamScreen renders Question Types and handles selection',
+      (WidgetTester tester) async {
+    final exam = Exam(
+      id: 'exam_1',
+      name: 'Certification Exam',
+      questions: [
+        Question(
+          id: 'q1',
+          question: 'Single Choice 1',
+          options: ['A', 'B', 'C', 'D'],
+          correctAnswers: {0},
+          questionType: 'single',
+        ),
+        Question(
+          id: 'q2',
+          question: 'Multiple Choice 1',
+          options: ['A', 'B', 'C', 'D'],
+          correctAnswers: {0, 1},
+          questionType: 'multiple',
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(MaterialApp(
+      home: TakeExamScreen(
+        exams: [exam],
+        initialExamId: 'exam_1',
+      ),
+    ));
+
+    await tester.pumpAndSettle();
+
+    // Verify Question Types section is present
+    expect(find.textContaining('3. Question Types'), findsOneWidget);
+    expect(find.text('All Question Types (2)'), findsOneWidget);
+    expect(find.text('Single Choice (1)'), findsOneWidget);
+    expect(find.text('Multiple Choice (1)'), findsOneWidget);
+
+    // Tap Clear Selection
+    await tester.tap(find.text('Clear Selection'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please select at least one question type to start.'),
+        findsOneWidget);
+
+    // Tap Single Choice only
+    await tester.tap(find.text('Single Choice (1)'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please select at least one question type to start.'),
+        findsNothing);
   });
 
   testWidgets('Exam model correctly tracks next question IDs and reindexing',

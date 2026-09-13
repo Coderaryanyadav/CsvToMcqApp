@@ -1,5 +1,7 @@
 import 'package:uuid/uuid.dart';
 
+const Object _unset = Object();
+
 class Question {
   final String id;
   String question;
@@ -26,10 +28,16 @@ class Question {
     this.tags = const [],
     this.displayNumber,
   })  : id = (id != null && id.isNotEmpty) ? id : const Uuid().v4(),
-        correctAnswers = correctAnswers ?? (correct != null ? {correct} : {0}),
+        correctAnswers = correctAnswers ??
+            (correct != null && correct >= 0 ? {correct} : <int>{}),
         optionExplanations = optionExplanations ??
             (explanation != null && explanation.isNotEmpty
-                ? {(correct ?? 0): explanation}
+                ? {
+                    (correct ??
+                        (correctAnswers?.isNotEmpty == true
+                            ? correctAnswers!.first
+                            : 0)): explanation
+                  }
                 : {});
 
   // Display label for UI (e.g., "Q1" or "Question 1")
@@ -41,8 +49,8 @@ class Question {
   }
 
   // Legacy convenience getter/setter
-  int get correct => correctAnswers.isNotEmpty ? correctAnswers.first : 0;
-  set correct(int val) => correctAnswers = {val};
+  int get correct => correctAnswers.isNotEmpty ? correctAnswers.first : -1;
+  set correct(int val) => correctAnswers = val >= 0 ? {val} : <int>{};
 
   bool get isMultiple =>
       questionType == 'multiple' || correctAnswers.length > 1;
@@ -73,10 +81,10 @@ class Question {
     List<String>? options,
     Set<int>? correctAnswers,
     Map<int, String>? optionExplanations,
-    String? topic,
+    Object? topic = _unset,
     int? difficulty,
     List<String>? tags,
-    int? displayNumber,
+    Object? displayNumber = _unset,
   }) {
     return Question(
       id: id ?? this.id,
@@ -86,10 +94,12 @@ class Question {
       correctAnswers: correctAnswers ?? Set.from(this.correctAnswers),
       optionExplanations:
           optionExplanations ?? Map.from(this.optionExplanations),
-      topic: topic ?? this.topic,
+      topic: identical(topic, _unset) ? this.topic : topic as String?,
       difficulty: difficulty ?? this.difficulty,
       tags: tags ?? List.from(this.tags),
-      displayNumber: displayNumber ?? this.displayNumber,
+      displayNumber: identical(displayNumber, _unset)
+          ? this.displayNumber
+          : displayNumber as int?,
     );
   }
 
@@ -115,9 +125,10 @@ class Question {
       answers =
           (j['correctAnswers'] as List).map((e) => (e as num).toInt()).toSet();
     } else if (j['correct'] != null) {
-      answers = {(j['correct'] as num).toInt()};
+      final c = (j['correct'] as num).toInt();
+      if (c >= 0) answers = {c};
     } else {
-      answers = {0};
+      answers = {};
     }
 
     String type = j['questionType']?.toString().toLowerCase() ?? 'single';

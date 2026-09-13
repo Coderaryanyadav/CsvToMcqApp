@@ -52,8 +52,14 @@ class BackupService {
     }
 
     final file = result.files.single;
-    final bytes = file.bytes ??
-        (file.path != null ? File(file.path!).readAsBytesSync() : <int>[]);
+    final List<int> bytes;
+    if (file.bytes != null) {
+      bytes = file.bytes!;
+    } else if (file.path != null) {
+      bytes = await File(file.path!).readAsBytes();
+    } else {
+      bytes = <int>[];
+    }
 
     if (bytes.isEmpty) {
       return BackupRestoreResult(

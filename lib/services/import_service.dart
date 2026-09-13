@@ -66,8 +66,14 @@ class ImportService {
     if (result == null || result.files.isEmpty) return null;
 
     final file = result.files.single;
-    final bytes = file.bytes ??
-        (file.path != null ? File(file.path!).readAsBytesSync() : <int>[]);
+    final List<int> bytes;
+    if (file.bytes != null) {
+      bytes = file.bytes!;
+    } else if (file.path != null) {
+      bytes = await File(file.path!).readAsBytes();
+    } else {
+      bytes = <int>[];
+    }
     final filename = file.name;
 
     final existingQuestions = targetExam?.questions
@@ -149,18 +155,27 @@ class ImportService {
         criticalErrors: ['Excel file has no sheets or is invalid.'],
       );
     }
-    final sheet = excel.tables[excel.tables.keys.first]!;
+    final sheetNames = excel.tables.keys.toList();
+    final primarySheetName = sheetNames.first;
+    final sheet = excel.tables[primarySheetName]!;
     final List<List<dynamic>> rows = [];
     for (var r in sheet.rows) {
       rows.add(r.map((e) => e?.value?.toString() ?? '').toList());
     }
-    return processRows(
+    final result = processRows(
       rows,
       filename,
       startQuestionNumber: startQuestionNumber,
       existingQuestions: existingQuestions,
       targetExamName: targetExamName,
     );
+    if (sheetNames.length > 1) {
+      result.warnings.insert(
+        0,
+        'Excel contains ${sheetNames.length} sheets (${sheetNames.join(', ')}). Imported primary sheet "$primarySheetName".',
+      );
+    }
+    return result;
   }
 
   static String _normalizeHeader(String header) {
@@ -412,28 +427,33 @@ class ImportService {
         ));
       }
 
-      final options = [oA, oB, oC, oD];
-      if (options.any((o) => o.isEmpty)) {
+      final List<String> options = [];
+      if (oA.isNotEmpty) options.add(oA);
+      if (oB.isNotEmpty) options.add(oB);
+      if (oC.isNotEmpty) options.add(oC);
+      if (oD.isNotEmpty) options.add(oD);
+
+      if (options.length < 2) {
         final err =
-            'Row $rowNum: One or more options are empty for question: "$qText"';
+            'Row $rowNum: Question requires at least 2 non-empty options for: "$qText"';
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
-          problem: 'Missing one or more options A/B/C/D',
-          suggestion: 'Ensure all 4 option columns contain text',
+          problem: 'Fewer than 2 options provided',
+          suggestion: 'Provide at least option A and option B',
         ));
         continue;
       }
 
       final uniqueOptions = options.map((e) => e.toLowerCase()).toSet();
-      if (uniqueOptions.length < 4) {
+      if (uniqueOptions.length < options.length) {
         final err =
             'Row $rowNum: Duplicate options found for question: "$qText"';
         criticalErrors.add(err);
         issues.add(ImportErrorDetail(
           row: rowNum,
           problem: 'Duplicate option texts in same question',
-          suggestion: 'Ensure each of the 4 options is unique',
+          suggestion: 'Ensure each option is unique',
         ));
         continue;
       }
@@ -459,17 +479,17 @@ class ImportService {
           .toList();
 
       for (var token in tokens) {
-        if (token == 'a' || token == '1') {
+        if ((token == 'a' || token == '1') && options.isNotEmpty) {
           parsedAnswers.add(0);
-        } else if (token == 'b' || token == '2') {
+        } else if ((token == 'b' || token == '2') && options.length > 1) {
           parsedAnswers.add(1);
-        } else if (token == 'c' || token == '3') {
+        } else if ((token == 'c' || token == '3') && options.length > 2) {
           parsedAnswers.add(2);
-        } else if (token == 'd' || token == '4') {
+        } else if ((token == 'd' || token == '4') && options.length > 3) {
           parsedAnswers.add(3);
         } else {
           // Exact match option text check
-          for (int j = 0; j < 4; j++) {
+          for (int j = 0; j < options.length; j++) {
             if (options[j].toLowerCase() == token) {
               parsedAnswers.add(j);
               break;
@@ -480,7 +500,7 @@ class ImportService {
 
       // If tokens didn't parse but whole raw string matches an option exactly
       if (parsedAnswers.isEmpty) {
-        for (int j = 0; j < 4; j++) {
+        for (int j = 0; j < options.length; j++) {
           if (options[j].toLowerCase() == correctRaw.toLowerCase()) {
             parsedAnswers.add(j);
             break;

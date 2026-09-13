@@ -54,14 +54,14 @@ class StorageService {
     await _repo.setActiveStudentId(student.id);
   }
 
-  static Future<List<ExamPerformance>>
-      loadPerformancesForActiveStudent() async {
+  static Future<List<ExamPerformance>> loadPerformancesForActiveStudent(
+      {String? studentId}) async {
     final all = await loadAllPerformancesAsync();
-    final activeStudent = await getActiveStudent();
-    if (activeStudent == null) return all;
-    return all
-        .where((p) => p.studentId == null || p.studentId == activeStudent.id)
-        .toList();
+    final targetStudentId = studentId ?? (await getActiveStudentId());
+    if (targetStudentId == null) {
+      return all.where((p) => p.studentId == null).toList();
+    }
+    return all.where((p) => p.studentId == targetStudentId).toList();
   }
 
   static Future<List<ExamPerformance>> getPerformancesForExamAsync(
@@ -70,10 +70,9 @@ class StorageService {
     final all = await loadAllPerformancesAsync();
     final targetStudentId = studentId ?? (await getActiveStudentId());
     return all.where((p) {
-      final matchesExam = p.examId == examId;
-      if (targetStudentId == null) return matchesExam;
-      return matchesExam &&
-          (p.studentId == null || p.studentId == targetStudentId);
+      if (p.examId != examId) return false;
+      if (targetStudentId == null) return p.studentId == null;
+      return p.studentId == targetStudentId;
     }).toList();
   }
 
