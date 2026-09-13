@@ -442,14 +442,11 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Wrap(
-                          alignment: WrapAlignment.spaceBetween,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          spacing: 8,
-                          runSpacing: 4,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Select Allowed Question Types',
+                              'Allowed Question Types',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
@@ -459,71 +456,276 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                TextButton(
-                                  onPressed: () =>
-                                      _toggleAllQuestionTypes(true),
-                                  style: TextButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8),
+                                InkWell(
+                                  onTap: () => _toggleAllQuestionTypes(true),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 4),
+                                    child: Text(
+                                      'Select All',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.accentBlue,
+                                      ),
+                                    ),
                                   ),
-                                  child: const Text('Select All'),
                                 ),
-                                const Text('•',
+                                const Text(' • ',
                                     style: TextStyle(
                                         color: AppTheme.secondaryText)),
-                                TextButton(
-                                  onPressed: () =>
-                                      _toggleAllQuestionTypes(false),
-                                  style: TextButton.styleFrom(
-                                    visualDensity: VisualDensity.compact,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8),
+                                InkWell(
+                                  onTap: () => _toggleAllQuestionTypes(false),
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 4),
+                                    child: Text(
+                                      'Clear',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppTheme.secondaryText,
+                                      ),
+                                    ),
                                   ),
-                                  child: const Text('Clear Selection'),
                                 ),
                               ],
                             ),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: [
-                            // "All Question Types" master chip
-                            FilterChip(
-                              label: Text(
-                                  'All Question Types (${avail.totalAvailable})'),
-                              selected: isAllQuestionTypes,
-                              avatar: Icon(
-                                isAllQuestionTypes
-                                    ? Icons.check_circle_rounded
-                                    : Icons.circle_outlined,
-                                size: 18,
-                              ),
-                              onSelected: (v) => _toggleAllQuestionTypes(v),
-                            ),
-                            // Individual types
-                            ...availableQuestionTypes.map((typeInfo) {
-                              final count = avail.getCountForType(typeInfo.id);
-                              final isSelected = isAllQuestionTypes ||
-                                  selectedQuestionTypes.contains(typeInfo.id);
+                        const SizedBox(height: 14),
 
-                              return FilterChip(
-                                avatar: Icon(typeInfo.icon, size: 18),
-                                label: Text('${typeInfo.displayName} ($count)'),
-                                selected: isSelected,
-                                onSelected: (v) {
-                                  _toggleQuestionType(typeInfo.id, v);
-                                },
-                              );
-                            }),
-                          ],
+                        // Master "All Question Types" Tile
+                        InkWell(
+                          onTap: () =>
+                              _toggleAllQuestionTypes(!isAllQuestionTypes),
+                          borderRadius: BorderRadius.circular(12),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isAllQuestionTypes
+                                  ? AppTheme.accentBlue.withValues(alpha: 0.08)
+                                  : (isDark
+                                      ? AppTheme.darkSurface
+                                      : Colors.grey.shade50),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isAllQuestionTypes
+                                    ? AppTheme.accentBlue
+                                    : (isDark
+                                        ? AppTheme.darkBorder
+                                        : AppTheme.border),
+                                width: isAllQuestionTypes ? 1.5 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: isAllQuestionTypes
+                                        ? AppTheme.accentBlue
+                                        : Colors.grey.shade300,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    color: Colors.white,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'All Question Types',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      Text(
+                                        'Include all ${avail.totalAvailable} questions in this track',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppTheme.secondaryText,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isAllQuestionTypes
+                                        ? AppTheme.accentBlue
+                                            .withValues(alpha: 0.15)
+                                        : Colors.grey.shade200,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    '${avail.totalAvailable} Qs',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isAllQuestionTypes
+                                          ? AppTheme.accentBlue
+                                          : AppTheme.secondaryText,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  isAllQuestionTypes
+                                      ? Icons.check_circle_rounded
+                                      : Icons.radio_button_unchecked,
+                                  color: isAllQuestionTypes
+                                      ? AppTheme.accentBlue
+                                      : Colors.grey,
+                                  size: 22,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
+
+                        const SizedBox(height: 12),
+
+                        // Individual Question Type Rows/Cards
+                        ...availableQuestionTypes.map((typeInfo) {
+                          final count = avail.getCountForType(typeInfo.id);
+                          final isSelected = isAllQuestionTypes ||
+                              selectedQuestionTypes.contains(typeInfo.id);
+                          final isMulti = typeInfo.id ==
+                                  QuestionTypeHelper.typeMultiple ||
+                              typeInfo.id == 'multi' ||
+                              typeInfo.id == 'multiple';
+
+                          Color iconBg = isMulti
+                              ? const Color(0xFFF3E8FF)
+                              : const Color(0xFFDBEAFE);
+                          Color iconColor = isMulti
+                              ? const Color(0xFF7C3AED)
+                              : AppTheme.accentBlue;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: InkWell(
+                              onTap: () {
+                                _toggleQuestionType(typeInfo.id, !isSelected);
+                              },
+                              borderRadius: BorderRadius.circular(10),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? (isDark
+                                          ? AppTheme.accentBlue
+                                              .withValues(alpha: 0.12)
+                                          : const Color(0xFFF8FAFC))
+                                      : (isDark
+                                          ? AppTheme.darkSurface
+                                          : Colors.white),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppTheme.accentBlue
+                                        : (isDark
+                                            ? AppTheme.darkBorder
+                                            : AppTheme.border),
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(7),
+                                      decoration: BoxDecoration(
+                                        color: iconBg,
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        typeInfo.icon,
+                                        color: iconColor,
+                                        size: 17,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Row(
+                                        children: [
+                                          Text(
+                                            typeInfo.displayName,
+                                            style: TextStyle(
+                                              fontWeight: isSelected
+                                                  ? FontWeight.bold
+                                                  : FontWeight.w500,
+                                              fontSize: 14,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : AppTheme.text,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(
+                                                horizontal: 7, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: isSelected
+                                                  ? (isMulti
+                                                      ? const Color(0xFFEDE9FE)
+                                                      : const Color(0xFFE0F2FE))
+                                                  : Colors.grey.shade100,
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              '$count Questions',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w600,
+                                                color: isSelected
+                                                    ? (isMulti
+                                                        ? const Color(
+                                                            0xFF6D28D9)
+                                                        : const Color(
+                                                            0xFF0284C7))
+                                                    : AppTheme.secondaryText,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Icon(
+                                      isSelected
+                                          ? Icons.check_box_rounded
+                                          : Icons.check_box_outline_blank_rounded,
+                                      color: isSelected
+                                          ? AppTheme.accentBlue
+                                          : Colors.grey.shade400,
+                                      size: 22,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+
                         if (!isAllQuestionTypes &&
                             selectedQuestionTypes.isEmpty) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 8),
@@ -535,15 +737,15 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                             child: Row(
                               children: [
                                 Icon(Icons.warning_amber_rounded,
-                                    size: 20, color: Colors.orange.shade800),
+                                    size: 18, color: Colors.orange.shade800),
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(
-                                    'Please select at least one question type to start.',
+                                    'Please select at least one question type.',
                                     style: TextStyle(
                                       color: Colors.brown,
                                       fontWeight: FontWeight.w600,
-                                      fontSize: 13,
+                                      fontSize: 12,
                                     ),
                                   ),
                                 ),

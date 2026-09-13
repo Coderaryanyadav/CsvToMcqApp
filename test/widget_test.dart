@@ -147,22 +147,22 @@ void main() {
 
     // Verify Question Types section is present
     expect(find.textContaining('3. Question Types'), findsOneWidget);
-    expect(find.text('All Question Types (2)'), findsOneWidget);
-    expect(find.text('Single Choice (1)'), findsOneWidget);
-    expect(find.text('Multiple Choice (1)'), findsOneWidget);
+    expect(find.text('All Question Types'), findsOneWidget);
+    expect(find.text('Single Choice'), findsOneWidget);
+    expect(find.text('Multiple Choice'), findsOneWidget);
 
-    // Tap Clear Selection
-    await tester.tap(find.text('Clear Selection'));
+    // Tap Clear
+    await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Please select at least one question type to start.'),
-        findsOneWidget);
+    expect(find.text('Please select at least one question type.'),
+        findsWidgets);
 
     // Tap Single Choice only
-    await tester.tap(find.text('Single Choice (1)'));
+    await tester.tap(find.text('Single Choice'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Please select at least one question type to start.'),
+    expect(find.text('Please select at least one question type.'),
         findsNothing);
   });
 
