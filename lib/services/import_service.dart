@@ -127,9 +127,10 @@ class ImportService {
       text = text.substring(3);
     }
     text = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    List<List<dynamic>> rows =
-        const CsvToListConverter(eol: '\n', shouldParseNumbers: false)
-            .convert(text);
+    List<List<dynamic>> rows = Csv(
+      lineDelimiter: '\n',
+      dynamicTyping: false,
+    ).decode(text);
     return processRows(
       rows,
       filename,
@@ -663,7 +664,7 @@ class ImportService {
       ]);
     }
 
-    final csvString = const ListToCsvConverter().convert(rows);
+    final csvString = Csv().encode(rows);
 
     final sanitizedName = exam.name.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
     final outputFile = await FilePicker.platform.saveFile(
