@@ -3,16 +3,37 @@ import '../models/exam.dart';
 import '../models/performance.dart';
 import '../models/student_profile.dart';
 import '../repositories/storage_repository.dart';
+import 'migration_service.dart';
 
 class StorageService {
   static IStorageRepository _repo = IoStorageRepository();
+  static final MigrationManager _migrationManager = MigrationManager();
 
   static void setRepository(IStorageRepository repo) {
     _repo = repo;
   }
 
+  static IStorageRepository get repository => _repo;
+
   static Future<void> init() async {
     await _repo.init();
+    if (_repo is IoStorageRepository) {
+      final ioRepo = _repo as IoStorageRepository;
+      await _migrationManager.runMigrations(
+        mcqDir: ioRepo.mcqDir,
+        repo: _repo,
+      );
+    }
+  }
+
+  static Future<StorageMeta?> getStorageMetadata() async {
+    final metaMap = await _repo.getStorageMetadata();
+    if (metaMap == null) return null;
+    return StorageMeta.fromJson(metaMap);
+  }
+
+  static Future<int> getStorageSchemaVersion() async {
+    return _repo.getStorageSchemaVersion();
   }
 
   static Future<Directory> getDownloadsDirectory() async {

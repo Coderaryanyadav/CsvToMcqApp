@@ -49,6 +49,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
   bool shuffleQuestions = true;
   bool shuffleOptions = false;
   String selectedDifficulty = 'Any';
+  String selectedChapter = 'All Chapters';
+  List<String> availableChapters = ['All Chapters'];
   String selectedTopic = 'All Topics';
   List<String> availableTopics = ['All Topics'];
 
@@ -115,15 +117,28 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     _customCountCtrl.text = '$selectedQuestionCount';
     _customDurationCtrl.text = '$selectedDurationMin';
 
-    final topics = selectedExam!.questions
-        .map((q) => q.topic)
-        .where((t) => t != null && t.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList();
-    topics.sort();
+    final chapters =
+        QuestionSelectionService.discoverChapters(selectedExam!.questions);
+    availableChapters = ['All Chapters', ...chapters];
+    selectedChapter = 'All Chapters';
+
+    _updateTopics();
+  }
+
+  void _updateTopics() {
+    if (selectedExam == null) {
+      availableTopics = ['All Topics'];
+      selectedTopic = 'All Topics';
+      return;
+    }
+    final topics = QuestionSelectionService.discoverTopics(
+      selectedExam!.questions,
+      selectedChapter: selectedChapter,
+    );
     availableTopics = ['All Topics', ...topics];
-    selectedTopic = 'All Topics';
+    if (!availableTopics.contains(selectedTopic)) {
+      selectedTopic = 'All Topics';
+    }
   }
 
   QuestionAvailability get _availability {
@@ -136,6 +151,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
     }
     return QuestionSelectionService.getAvailability(
       questions: selectedExam!.questions,
+      selectedChapter: selectedChapter,
       selectedTopic: selectedTopic,
       selectedDifficulty: selectedDifficulty,
       onlyStarred: onlyStarred,
@@ -185,6 +201,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
       questions: selectedExam!.questions,
       selectedQuestionTypes: selectedQuestionTypes,
       isAllQuestionTypes: isAllQuestionTypes,
+      selectedChapter: selectedChapter,
       selectedTopic: selectedTopic,
       selectedDifficulty: selectedDifficulty,
       onlyStarred: onlyStarred,
@@ -275,6 +292,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
             examId: selectedExam!.id,
             examName: selectedExam!.name,
             passingPercentage: selectedExam!.passingPercentage,
+            selectedQuestionTypes: selectedQuestionTypes,
+            isAllQuestionTypes: isAllQuestionTypes,
+            shuffleQuestions: shuffleQuestions,
           ),
         ),
       );
@@ -450,7 +470,9 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
-                                color: isDark ? Colors.white : AppTheme.primaryNavy,
+                                color: isDark
+                                    ? Colors.white
+                                    : AppTheme.primaryNavy,
                               ),
                             ),
                             Row(
@@ -635,10 +657,10 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                               selectedQuestionTypes.contains(typeInfo.id);
                           final isExplicitlySelected =
                               !isAllQuestionTypes && isTypeChecked;
-                          final isMulti = typeInfo.id ==
-                                  QuestionTypeHelper.typeMultiple ||
-                              typeInfo.id == 'multi' ||
-                              typeInfo.id == 'multiple';
+                          final isMulti =
+                              typeInfo.id == QuestionTypeHelper.typeMultiple ||
+                                  typeInfo.id == 'multi' ||
+                                  typeInfo.id == 'multiple';
 
                           // Color schemes tailored to each question type
                           final Color accentColor = isMulti
@@ -742,8 +764,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                       decoration: BoxDecoration(
                                         color: isTypeChecked
                                             ? (isDark
-                                                ? accentColor
-                                                    .withValues(alpha: 0.2)
+                                                ? accentColor.withValues(
+                                                    alpha: 0.2)
                                                 : (isMulti
                                                     ? const Color(0xFFEDE9FE)
                                                     : const Color(0xFFE0F2FE)))
@@ -769,7 +791,8 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                                     Icon(
                                       isTypeChecked
                                           ? Icons.check_box_rounded
-                                          : Icons.check_box_outline_blank_rounded,
+                                          : Icons
+                                              .check_box_outline_blank_rounded,
                                       color: isTypeChecked
                                           ? (isExplicitlySelected
                                               ? accentColor
@@ -1060,6 +1083,70 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Chapter Dropdown
+                        Text(
+                          'Chapter',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                            color: isDark
+                                ? AppTheme.darkSecondaryText
+                                : AppTheme.secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppTheme.darkSurface
+                                : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isDark
+                                  ? AppTheme.darkBorder
+                                  : AppTheme.border,
+                            ),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<String>(
+                              isExpanded: true,
+                              value: selectedChapter,
+                              icon: const Icon(Icons.arrow_drop_down_rounded,
+                                  color: AppTheme.secondaryText),
+                              items: availableChapters.map((ch) {
+                                return DropdownMenuItem(
+                                  value: ch,
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.menu_book_outlined,
+                                          size: 18,
+                                          color: AppTheme.secondaryText),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          ch,
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }).toList(),
+                              onChanged: (v) {
+                                if (v != null) {
+                                  setState(() {
+                                    selectedChapter = v;
+                                    _updateTopics();
+                                  });
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
                         // Topic Dropdown
                         Text(
                           'Topic / Category',
@@ -1136,8 +1223,7 @@ class _TakeExamScreenState extends State<TakeExamScreen> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children:
-                              ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
+                          children: ['Any', 'Easy', 'Medium', 'Hard'].map((d) {
                             final isSel = selectedDifficulty == d;
                             return ChoiceChip(
                               label: Text(d),

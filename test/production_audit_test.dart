@@ -100,6 +100,21 @@ class MockMemoryStorageRepository implements IStorageRepository {
           String studentId, String questionId) async =>
       _bookmarks[studentId]?.contains(questionId) ?? false;
 
+  Map<String, dynamic>? _meta;
+
+  @override
+  Future<Map<String, dynamic>?> getStorageMetadata() async =>
+      _meta != null ? Map.from(_meta!) : null;
+
+  @override
+  Future<void> saveStorageMetadata(Map<String, dynamic> meta) async {
+    _meta = Map.from(meta);
+  }
+
+  @override
+  Future<int> getStorageSchemaVersion() async =>
+      (_meta?['schemaVersion'] as num?)?.toInt() ?? 2;
+
   @override
   Future<void> restoreFullBackupData(Map<String, dynamic> data) async {}
 

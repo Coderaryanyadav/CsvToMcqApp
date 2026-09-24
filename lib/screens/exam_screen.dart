@@ -13,6 +13,9 @@ class ExamScreen extends StatefulWidget {
   final String? examId;
   final String? examName;
   final int passingPercentage;
+  final Set<String>? selectedQuestionTypes;
+  final bool isAllQuestionTypes;
+  final bool shuffleQuestions;
 
   const ExamScreen({
     super.key,
@@ -21,6 +24,9 @@ class ExamScreen extends StatefulWidget {
     this.examId,
     this.examName,
     this.passingPercentage = 75,
+    this.selectedQuestionTypes,
+    this.isAllQuestionTypes = true,
+    this.shuffleQuestions = false,
   });
 
   @override
@@ -272,6 +278,9 @@ class _ExamScreenState extends State<ExamScreen> with WidgetsBindingObserver {
       'remainingSeconds': _remainingSeconds,
       'elapsedSeconds': _elapsedSeconds,
       'timeSpent': _timeSpent,
+      'selectedQuestionTypes': widget.selectedQuestionTypes?.toList(),
+      'isAllQuestionTypes': widget.isAllQuestionTypes,
+      'shuffleQuestions': widget.shuffleQuestions,
       'lastSavedAt': DateTime.now().toIso8601String(),
     };
     await StorageService.saveSession(widget.examId!, sessionData);

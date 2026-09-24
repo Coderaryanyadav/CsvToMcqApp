@@ -153,9 +153,42 @@ class QuestionAvailability {
 
 /// Core service for querying, filtering, and validating questions for Practice and Exam flows
 class QuestionSelectionService {
-  /// Computes availability counts given current base filters (topic, difficulty, starred)
+  /// Discovers all unique chapters present in questions
+  static List<String> discoverChapters(List<Question> questions) {
+    final Set<String> set = {};
+    for (final q in questions) {
+      if (q.chapter != null && q.chapter!.trim().isNotEmpty) {
+        set.add(q.chapter!.trim());
+      }
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  /// Discovers all unique topics present in questions, optionally filtered by active chapter
+  static List<String> discoverTopics(
+    List<Question> questions, {
+    String? selectedChapter,
+  }) {
+    final Set<String> set = {};
+    for (final q in questions) {
+      if (selectedChapter != null &&
+          selectedChapter.isNotEmpty &&
+          selectedChapter != 'All Chapters') {
+        if (q.chapter != selectedChapter) continue;
+      }
+      if (q.topic != null && q.topic!.trim().isNotEmpty) {
+        set.add(q.topic!.trim());
+      }
+    }
+    final list = set.toList()..sort();
+    return list;
+  }
+
+  /// Computes availability counts given current base filters (chapter, topic, difficulty, starred)
   static QuestionAvailability getAvailability({
     required List<Question> questions,
+    String? selectedChapter,
     String? selectedTopic,
     String? selectedDifficulty,
     bool onlyStarred = false,
@@ -165,6 +198,12 @@ class QuestionSelectionService {
 
     if (onlyStarred) {
       filtered = filtered.where((q) => bookmarkedIds.contains(q.id)).toList();
+    }
+
+    if (selectedChapter != null &&
+        selectedChapter.isNotEmpty &&
+        selectedChapter != 'All Chapters') {
+      filtered = filtered.where((q) => q.chapter == selectedChapter).toList();
     }
 
     if (selectedTopic != null &&
@@ -208,6 +247,7 @@ class QuestionSelectionService {
     required List<Question> questions,
     Set<String>? selectedQuestionTypes,
     bool isAllQuestionTypes = true,
+    String? selectedChapter,
     String? selectedTopic,
     String? selectedDifficulty,
     bool onlyStarred = false,
@@ -236,14 +276,21 @@ class QuestionSelectionService {
       list = list.where((q) => bookmarkedIds.contains(q.id)).toList();
     }
 
-    // 3. Filter by topic
+    // 3. Filter by chapter
+    if (selectedChapter != null &&
+        selectedChapter.isNotEmpty &&
+        selectedChapter != 'All Chapters') {
+      list = list.where((q) => q.chapter == selectedChapter).toList();
+    }
+
+    // 4. Filter by topic
     if (selectedTopic != null &&
         selectedTopic.isNotEmpty &&
         selectedTopic != 'All Topics') {
       list = list.where((q) => q.topic == selectedTopic).toList();
     }
 
-    // 4. Filter by difficulty
+    // 5. Filter by difficulty
     if (selectedDifficulty != null &&
         selectedDifficulty.isNotEmpty &&
         selectedDifficulty != 'Any') {

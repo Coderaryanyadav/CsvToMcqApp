@@ -23,8 +23,14 @@ This document outlines the standard release lifecycle for **QuizPro**.
   ```
 - [ ] Verify release builds locally:
   ```bash
-  flutter build apk --release
-  flutter build macos --release
+  # Option A: Build all platforms at once
+  ./build_all.sh
+
+  # Option B: Run individual target scripts
+  ./scripts/build_android.sh
+  ./scripts/build_ios.sh
+  ./scripts/build_macos.sh
+  ./scripts/build_windows.sh
   ```
 
 ---

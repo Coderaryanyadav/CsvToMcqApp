@@ -18,8 +18,7 @@ It combines a multi-student profile system, safe atomic local persistence, resil
 
 ---
 
-## 🚀 Key Features
-
+* **🛡️ Production Update-Safe Migration Engine**: Built-in `MigrationManager` guarantees that updating the application preserves 100% of user accounts, learning progress, practice history, exam records, bookmarks, and preferences without data resets.
 * **🎯 Question-Type Selection & Filtering**: Explicitly choose which question types to practice or include in exam simulations (e.g. *Single Choice Only*, *Multiple Choice / Multiple Select Only*, *True/False*, or *All Types*). Real-time availability badges instantly reflect matching questions.
 * **👥 Multi-Student Profiles & Data Isolation**: Create separate student profiles with custom avatar emojis and colors. Statistics, attempt histories, bookmarks, and sessions are isolated per active student.
 * **📂 Flexible CSV & Excel (XLSX) Import**: Intelligent header alias normalization (`question_text`, `choice_1`–`4`, `correct_answer`, `explanation_a`–`d`, etc.) with duplicate detection and an interactive validation preview.
@@ -117,12 +116,18 @@ lib/
 ├── main.dart                   # Application entry point & theme listener
 ├── models/                     # Data models (Exam, Question, Performance, StudentProfile)
 ├── repositories/               # Storage repository abstraction & atomic IO implementation
-├── services/                   # Business logic (AnalyticsService, ImportService, BackupService, StreakService)
+├── services/                   # Business logic (MigrationManager, Analytics, Import, Backup, Streak)
 ├── screens/                    # UI screens (Home, Exam, Practice, QuestionBank, Statistics, Settings, Welcome)
 ├── theme/                      # Centralized design tokens (AppTheme, Light & Dark themes)
 ├── utils/                      # Input validators & helpers
 └── widgets/                    # Reusable components (AppLogo, etc.)
 ```
+
+### 📚 Architecture & Engineering Documentation
+* [Data Architecture Blueprint](docs/DATA_ARCHITECTURE.md) — Comprehensive storage engine, persistence matrix, and lifecycle guarantees.
+* [Schema & Migrations Guide](docs/MIGRATIONS.md) — Storage schema version registry, migration pipeline, and update contracts.
+* [Release Checklist](docs/RELEASE.md) — Production release process and in-place upgrade verification steps.
+* [Data Model Specification](docs/DATA_MODEL.md) — Complete JSON schemas and entity relationships.
 
 ---
 
@@ -143,9 +148,24 @@ flutter test
 
 ---
 
-## 📦 Building for Release & Deployment
+### 🚀 One-Command Automated Build (All Platforms)
+Run the master script to build all platforms and collect distribution artifacts into `release_bundles/`:
+```bash
+./build_all.sh
+```
 
-### 🤖 Android (Google Play Store & Sideload APK)
+### 🎯 Separated Platform Scripts
+Individual platform scripts are available in `scripts/`:
+- **Android APK & AAB**: `./scripts/build_android.sh` (`--aab` for Play Store bundle)
+- **iOS / IPA**: `./scripts/build_ios.sh` (`--signed` for App Store certificate signing)
+- **macOS Desktop**: `./scripts/build_macos.sh`
+- **Windows Desktop**: `./scripts/build_windows.sh` (or `.\scripts\build_windows.ps1` / `.\scripts\build_windows.bat` on Windows)
+
+---
+
+### Manual Commands
+
+#### 🤖 Android (Google Play Store & Sideload APK)
 ```bash
 # 1. Google Play Store Release (AAB)
 flutter build appbundle --release
@@ -156,16 +176,22 @@ flutter build apk --release
 # Output: build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### 🍏 macOS Desktop
+#### 🍏 macOS Desktop
 ```bash
 flutter build macos --release
 # Output: build/macos/Build/Products/Release/csv_to_mcq_app.app
 ```
 
-### 📱 iOS
+#### 📱 iOS
 ```bash
 flutter build ipa --release
 # Output: build/ios/ipa/*.ipa
+```
+
+#### 🪟 Windows Desktop
+```bash
+flutter build windows --release
+# Output: build/windows/x64/runner/Release/
 ```
 
 For detailed release checklists and deployment instructions, see [docs/releasing.md](docs/releasing.md).

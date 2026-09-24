@@ -4,6 +4,7 @@ import '../models/exam.dart';
 import '../models/question.dart';
 import '../services/storage_service.dart';
 import '../services/import_service.dart';
+import '../services/question_selection_service.dart';
 import '../theme/app_theme.dart';
 import 'import_preview_screen.dart';
 
@@ -26,6 +27,7 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
   Exam? _selectedExam;
   final TextEditingController _searchCtrl = TextEditingController();
 
+  String _selectedChapter = 'All Chapters';
   String _selectedTopic = 'All Topics';
   String _selectedDifficulty = 'All';
   String _selectedType = 'All';
@@ -98,10 +100,16 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
         final inQ = q.question.toLowerCase().contains(query);
         final inId = q.id.toLowerCase().contains(query);
         final inOpts = q.options.any((o) => o.toLowerCase().contains(query));
+        final inChapter = q.chapter?.toLowerCase().contains(query) ?? false;
         final inTopic = q.topic?.toLowerCase().contains(query) ?? false;
         final inTags = q.tags.any((t) => t.toLowerCase().contains(query));
-        return inQ || inId || inOpts || inTopic || inTags;
+        return inQ || inId || inOpts || inChapter || inTopic || inTags;
       }).toList();
+    }
+
+    // Chapter
+    if (_selectedChapter != 'All Chapters') {
+      list = list.where((q) => q.chapter == _selectedChapter).toList();
     }
 
     // Topic
@@ -149,15 +157,19 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
     }
   }
 
+  List<String> get _chapters {
+    if (_selectedExam == null) return ['All Chapters'];
+    final c =
+        QuestionSelectionService.discoverChapters(_selectedExam!.questions);
+    return ['All Chapters', ...c];
+  }
+
   List<String> get _topics {
     if (_selectedExam == null) return ['All Topics'];
-    final t = _selectedExam!.questions
-        .map((q) => q.topic)
-        .where((x) => x != null && x.isNotEmpty)
-        .cast<String>()
-        .toSet()
-        .toList();
-    t.sort();
+    final t = QuestionSelectionService.discoverTopics(
+      _selectedExam!.questions,
+      selectedChapter: _selectedChapter,
+    );
     return ['All Topics', ...t];
   }
 
@@ -328,6 +340,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
     final expDCtrl = TextEditingController(
         text: questionToEdit?.optionExplanations[3] ?? '');
 
+    final chapterCtrl =
+        TextEditingController(text: questionToEdit?.chapter ?? '');
     final topicCtrl = TextEditingController(text: questionToEdit?.topic ?? '');
     final tagsCtrl =
         TextEditingController(text: questionToEdit?.tags.join(', ') ?? '');
@@ -503,6 +517,16 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         children: [
                           Expanded(
                             child: TextField(
+                              controller: chapterCtrl,
+                              decoration: const InputDecoration(
+                                labelText: 'Chapter',
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
                               controller: topicCtrl,
                               decoration: const InputDecoration(
                                 labelText: 'Topic',
@@ -510,29 +534,27 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: DropdownButtonFormField<int>(
-                              initialValue: difficulty,
-                              decoration: const InputDecoration(
-                                labelText: 'Difficulty',
-                                border: OutlineInputBorder(),
-                              ),
-                              items: [1, 2, 3, 4, 5]
-                                  .map((d) => DropdownMenuItem(
-                                        value: d,
-                                        child: Text(
-                                            '$d (${d <= 2 ? "Easy" : d <= 4 ? "Medium" : "Hard"})'),
-                                      ))
-                                  .toList(),
-                              onChanged: (v) {
-                                if (v != null) {
-                                  setDlgState(() => difficulty = v);
-                                }
-                              },
-                            ),
-                          ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<int>(
+                        initialValue: difficulty,
+                        decoration: const InputDecoration(
+                          labelText: 'Difficulty',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: [1, 2, 3, 4, 5]
+                            .map((d) => DropdownMenuItem(
+                                  value: d,
+                                  child: Text(
+                                      '$d (${d <= 2 ? "Easy" : d <= 4 ? "Medium" : "Hard"})'),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setDlgState(() => difficulty = v);
+                          }
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -601,6 +623,13 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                         .where((t) => t.isNotEmpty)
                         .toList();
 
+                    final chapterVal = chapterCtrl.text.trim().isEmpty
+                        ? null
+                        : chapterCtrl.text.trim();
+                    final topicVal = topicCtrl.text.trim().isEmpty
+                        ? null
+                        : topicCtrl.text.trim();
+
                     if (isEdit) {
                       questionToEdit.question = qText;
                       questionToEdit.options = [oA, oB, oC, oD];
@@ -608,9 +637,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       questionToEdit.questionType =
                           correctAnswers.length > 1 ? 'multiple' : questionType;
                       questionToEdit.optionExplanations = expMap;
-                      questionToEdit.topic = topicCtrl.text.trim().isEmpty
-                          ? null
-                          : topicCtrl.text.trim();
+                      questionToEdit.chapter = chapterVal;
+                      questionToEdit.topic = topicVal;
                       questionToEdit.difficulty = difficulty;
                       questionToEdit.tags = tags;
                     } else {
@@ -623,9 +651,8 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                             ? 'multiple'
                             : questionType,
                         optionExplanations: expMap,
-                        topic: topicCtrl.text.trim().isEmpty
-                            ? null
-                            : topicCtrl.text.trim(),
+                        chapter: chapterVal,
+                        topic: topicVal,
                         difficulty: difficulty,
                         tags: tags,
                         displayNumber: _selectedExam!.nextQuestionNumber,
@@ -831,6 +858,11 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                     spacing: 8,
                     runSpacing: 4,
                     children: [
+                      if (q.chapter != null && q.chapter!.isNotEmpty)
+                        Chip(
+                          label: Text('Chapter: ${q.chapter}'),
+                          avatar: const Icon(Icons.menu_book, size: 14),
+                        ),
                       if (q.topic != null)
                         Chip(
                           label: Text('Topic: ${q.topic}'),
@@ -1185,6 +1217,30 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                       ),
                       const SizedBox(width: 16),
 
+                      // Chapter Filter
+                      DropdownButton<String>(
+                        value: _selectedChapter,
+                        items: _chapters
+                            .map((c) => DropdownMenuItem(
+                                  value: c,
+                                  child: Text(c,
+                                      style: const TextStyle(fontSize: 13)),
+                                ))
+                            .toList(),
+                        onChanged: (v) {
+                          if (v != null) {
+                            setState(() {
+                              _selectedChapter = v;
+                              if (!_topics.contains(_selectedTopic)) {
+                                _selectedTopic = 'All Topics';
+                              }
+                              _recomputeFilteredQuestions();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(width: 16),
+
                       // Topic Filter
                       DropdownButton<String>(
                         value: _selectedTopic,
@@ -1479,6 +1535,24 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
                                 spacing: 6,
                                 runSpacing: 4,
                                 children: [
+                                  if (q.chapter != null &&
+                                      q.chapter!.isNotEmpty)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.shade50,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Ch: ${q.chapter!}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.blue.shade900,
+                                        ),
+                                      ),
+                                    ),
                                   if (q.topic != null && q.topic!.isNotEmpty)
                                     Container(
                                       padding: const EdgeInsets.symmetric(

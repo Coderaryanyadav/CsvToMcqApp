@@ -13,7 +13,6 @@ jobs:
   build-and-test:
     name: Analyze & Test
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -36,5 +35,72 @@ jobs:
       - name: Run Automated Tests
         run: flutter test --coverage
 
-      - name: Build Android Release APK (Validation)
+      - name: Build Android Release APK
         run: flutter build apk --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizPro-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  build-windows:
+    name: Build Windows Desktop Release
+    runs-on: windows-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable Windows Desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Compress Windows Release Bundle
+        run: Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\QuizPro-Windows.zip
+
+      - name: Upload Windows Desktop Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizPro-Windows-Desktop
+          path: build\QuizPro-Windows.zip
+
+  build-macos:
+    name: Build macOS Desktop Release
+    runs-on: macos-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Enable macOS Desktop
+        run: flutter config --enable-macos-desktop
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build macOS Release
+        run: flutter build macos --release
+
+      - name: Upload macOS Desktop Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: QuizPro-macOS-Desktop
+          path: build/macos/Build/Products/Release/csv_to_mcq_app.app

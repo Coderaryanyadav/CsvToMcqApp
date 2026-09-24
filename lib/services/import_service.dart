@@ -272,6 +272,15 @@ class ImportService {
     final expDAliases = {'explanation_d', 'exp_d', 'rationale_d'};
     final expAliases = {'explanation', 'rationale', 'notes', 'feedback'};
     final topicAliases = {'topic', 'category', 'subject', 'domain'};
+    final chapterAliases = {
+      'chapter',
+      'chapter_name',
+      'chapter_title',
+      'chap',
+      'ch',
+      'chapter_no',
+      'chap_no'
+    };
     final diffAliases = {'difficulty', 'level', 'diff'};
     final tagAliases = {'tags', 'tag', 'keywords'};
 
@@ -316,6 +325,8 @@ class ImportService {
           columnMap['explanation'] = c;
         } else if (topicAliases.contains(norm)) {
           columnMap['topic'] = c;
+        } else if (chapterAliases.contains(norm)) {
+          columnMap['chapter'] = c;
         } else if (diffAliases.contains(norm)) {
           columnMap['difficulty'] = c;
         } else if (tagAliases.contains(norm)) {
@@ -378,6 +389,7 @@ class ImportService {
       final expD = getCol('explanation_d');
       final genericExp = getCol('explanation');
       final topic = getCol('topic');
+      final chapter = getCol('chapter');
       final difficultyRaw = getCol('difficulty');
       final tagsRaw = getCol('tags');
 
@@ -567,6 +579,7 @@ class ImportService {
         questionType: questionType,
         optionExplanations: explanations,
         topic: topic.isNotEmpty ? topic : null,
+        chapter: chapter.isNotEmpty ? chapter : null,
         difficulty: diff,
         tags: tags,
         displayNumber: currentDisplayNum,
@@ -590,14 +603,16 @@ class ImportService {
   }
 
   static String getSampleCsvTemplate() {
-    return '''question,option_a,option_b,option_c,option_d,correct_answer,question_type,topic,difficulty,tags,explanation_a,explanation_b,explanation_c,explanation_d
-"What is the primary key in a database?","A unique identifier for each record","A foreign key from another table","An index for full text search","A temporary query variable","A","single","Databases",2,"SQL, DB","Correct: primary keys uniquely identify records","Incorrect","Incorrect","Incorrect"
-"Which of the following are cloud providers? (Select all that apply)","Amazon Web Services (AWS)","Microsoft Windows 11","Google Cloud Platform (GCP)","Apple macOS","A|C","multiple","Cloud Computing",3,"Cloud, Infrastructure","AWS is a major cloud provider","Windows 11 is an OS","GCP is a major cloud provider","macOS is an OS"''';
+    return '''chapter,topic,question,option_a,option_b,option_c,option_d,correct_answer,question_type,difficulty,tags,explanation_a,explanation_b,explanation_c,explanation_d
+"Chapter 1","Databases","What is the primary key in a database?","A unique identifier for each record","A foreign key from another table","An index for full text search","A temporary query variable","A","single",2,"SQL, DB","Correct: primary keys uniquely identify records","Incorrect","Incorrect","Incorrect"
+"Chapter 2","Cloud Computing","Which of the following are cloud providers? (Select all that apply)","Amazon Web Services (AWS)","Microsoft Windows 11","Google Cloud Platform (GCP)","Apple macOS","A|C","multiple",3,"Cloud, Infrastructure","AWS is a major cloud provider","Windows 11 is an OS","GCP is a major cloud provider","macOS is an OS"''';
   }
 
   static Future<String?> exportToCsvFile(Exam exam) async {
     final List<List<dynamic>> rows = [
       [
+        'chapter',
+        'topic',
         'question',
         'option_a',
         'option_b',
@@ -605,7 +620,6 @@ class ImportService {
         'option_d',
         'correct_answer',
         'question_type',
-        'topic',
         'difficulty',
         'tags',
         'explanation_a',
@@ -631,6 +645,8 @@ class ImportService {
       final expD = q.optionExplanations[3] ?? '';
 
       rows.add([
+        q.chapter ?? '',
+        q.topic ?? '',
         q.question,
         oA,
         oB,
@@ -638,7 +654,6 @@ class ImportService {
         oD,
         correctLetters,
         q.questionType,
-        q.topic ?? '',
         q.difficulty,
         q.tags.join(', '),
         expA,

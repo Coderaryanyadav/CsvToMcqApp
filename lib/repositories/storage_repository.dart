@@ -35,6 +35,11 @@ abstract class IStorageRepository {
   Future<void> toggleBookmark(String studentId, String questionId);
   Future<bool> isQuestionBookmarked(String studentId, String questionId);
 
+  // Storage Metadata & Migrations
+  Future<Map<String, dynamic>?> getStorageMetadata();
+  Future<void> saveStorageMetadata(Map<String, dynamic> meta);
+  Future<int> getStorageSchemaVersion();
+
   // Full Backup & Restore
   Future<Map<String, dynamic>> exportFullBackupData();
   Future<void> restoreFullBackupData(Map<String, dynamic> data);
@@ -227,11 +232,14 @@ class IoStorageRepository implements IStorageRepository {
     final List<Exam> exams = [];
     final entities = await mcqDir.list().toList();
     final files = entities.where((f) {
+      if (f is! File) return false;
       final filename = p.basename(f.path);
       return filename.endsWith('.json') &&
+          !filename.startsWith('.') &&
           !filename.startsWith('performance_') &&
           !filename.startsWith('session_') &&
           !filename.startsWith('bookmarks_') &&
+          !filename.startsWith('meta') &&
           filename != 'settings.json' &&
           filename != 'students.json';
     }).toList();
@@ -546,6 +554,37 @@ class IoStorageRepository implements IStorageRepository {
     await saveSettings(settings);
   }
 
+  @override
+  Future<Map<String, dynamic>?> getStorageMetadata() async {
+    await init();
+    final file = File('${mcqDir.path}/meta.json');
+    if (!await file.exists()) return null;
+    try {
+      final text = await file.readAsString();
+      return jsonDecode(text) as Map<String, dynamic>;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveStorageMetadata(Map<String, dynamic> meta) async {
+    await init();
+    final file = File('${mcqDir.path}/meta.json');
+    await _writeAtomic(file, jsonEncode(meta));
+  }
+
+  @override
+  Future<int> getStorageSchemaVersion() async {
+    final meta = await getStorageMetadata();
+    if (meta == null) {
+      final entities = await mcqDir.list().toList();
+      final hasLegacyData = entities.any((e) => e.path.endsWith('.json'));
+      return hasLegacyData ? 1 : 2;
+    }
+    return (meta['schemaVersion'] as num?)?.toInt() ?? 1;
+  }
+
   Map<String, dynamic> _defaultSettings() => {
         'themeMode': 'system', // system | light | dark
         'darkMode': false,
@@ -555,5 +594,7 @@ class IoStorageRepository implements IStorageRepository {
         'defaultDuration': 30,
         'defaultQuestionCount': 20,
         'defaultPassingScore': 75,
+        'dailyGoal': 20,
+        'schemaVersion': 2,
       };
 }

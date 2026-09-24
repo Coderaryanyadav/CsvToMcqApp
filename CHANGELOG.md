@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.0] - 2026-09-13
+
+### Added
+- **Centralized Startup Migration System**: Built `MigrationManager` (`lib/services/migration_service.dart`) with schema versioning (`meta.json`), deterministic and idempotent migration pipelines (`MigrationV1ToV2`), and automated pre-migration safety rollback snapshots (`.migration_snapshots/`).
+- **Update-Safe & Migration-Safe Guarantees**: Guaranteed 100% preservation of student accounts, bookmarks, exam question banks, historical exam results, active session states, and user settings across all future version updates.
+- **Active Session Filter State Preservation**: Interrupted exams now safely preserve question-type filters (`Single Choice`, `Multiple Choice`, `All`, etc.) and shuffle options during session autosave and recovery.
+- **Comprehensive Production Architecture Documentation**: Added `DATA_ARCHITECTURE.md`, `MIGRATIONS.md`, `RELEASE.md`, and `DATA_MODEL.md` in `docs/`.
+- **In-Place Upgrade Simulation Test Suite**: Added `migration_upgrade_simulation_test.dart` validating realistic upgrades over multi-user datasets with 20 exams, 50 attempts, bookmarks, and sessions.
+
 ## [1.1.0] - 2026-09-13
 
 ### Added

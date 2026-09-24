@@ -10,6 +10,7 @@ class Question {
   Set<int> correctAnswers; // 0..3 indices
   Map<int, String> optionExplanations; // 0..3 -> explanation string
   String? topic;
+  String? chapter;
   int difficulty; // 1 (easy) - 5 (hard)
   List<String> tags;
   int? displayNumber;
@@ -24,6 +25,7 @@ class Question {
     Map<int, String>? optionExplanations,
     String? explanation,
     this.topic,
+    this.chapter,
     this.difficulty = 3,
     this.tags = const [],
     this.displayNumber,
@@ -82,6 +84,7 @@ class Question {
     Set<int>? correctAnswers,
     Map<int, String>? optionExplanations,
     Object? topic = _unset,
+    Object? chapter = _unset,
     int? difficulty,
     List<String>? tags,
     Object? displayNumber = _unset,
@@ -95,6 +98,7 @@ class Question {
       optionExplanations:
           optionExplanations ?? Map.from(this.optionExplanations),
       topic: identical(topic, _unset) ? this.topic : topic as String?,
+      chapter: identical(chapter, _unset) ? this.chapter : chapter as String?,
       difficulty: difficulty ?? this.difficulty,
       tags: tags ?? List.from(this.tags),
       displayNumber: identical(displayNumber, _unset)
@@ -114,6 +118,7 @@ class Question {
             optionExplanations.map((k, v) => MapEntry(k.toString(), v)),
         'explanation': explanation, // Backwards compatibility
         'topic': topic,
+        'chapter': chapter,
         'difficulty': difficulty,
         'tags': tags,
         'displayNumber': displayNumber,
@@ -186,6 +191,7 @@ class Question {
       questionType: type,
       optionExplanations: explanations,
       topic: j['topic']?.toString(),
+      chapter: j['chapter']?.toString(),
       difficulty:
           j['difficulty'] != null ? (j['difficulty'] as num).toInt() : 3,
       tags: j['tags'] != null ? List<String>.from(j['tags']) : [],

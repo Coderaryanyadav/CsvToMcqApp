@@ -155,15 +155,15 @@ void main() {
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Please select at least one question type.'),
-        findsWidgets);
+    expect(
+        find.text('Please select at least one question type.'), findsWidgets);
 
     // Tap Single Choice only
     await tester.tap(find.text('Single Choice'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Please select at least one question type.'),
-        findsNothing);
+    expect(
+        find.text('Please select at least one question type.'), findsNothing);
   });
 
   testWidgets('Exam model correctly tracks next question IDs and reindexing',
