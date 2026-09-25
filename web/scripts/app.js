@@ -275,16 +275,39 @@ class QuizProApp {
               <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.4;">${this.escapeHtml(exam.description || 'No description provided.')}</p>
               
               <div style="display: flex; gap: 0.5rem; margin-top: auto;">
-                <button class="btn btn-secondary btn-sm btn-dash-practice" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'disabled' : ''}>
-                  ${Icons.play('', 12)} Practice
-                </button>
-                <button class="btn btn-primary btn-sm btn-dash-exam" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'disabled' : ''}>
-                  ${Icons.clock('', 12)} Timed Exam
-                </button>
+                ${qCount === 0 ? `
+                  <button class="btn btn-secondary btn-sm btn-dash-import" data-id="${exam.id}" style="flex: 1.2;">
+                    ${Icons.upload('', 12)} Import
+                  </button>
+                  <button class="btn btn-primary btn-sm btn-dash-add-q" data-id="${exam.id}" style="flex: 1;">
+                    ${Icons.plus('', 12)} Add Q
+                  </button>
+                ` : `
+                  <button class="btn btn-secondary btn-sm btn-dash-practice" data-id="${exam.id}" style="flex: 1;">
+                    ${Icons.play('', 12)} Practice
+                  </button>
+                  <button class="btn btn-primary btn-sm btn-dash-exam" data-id="${exam.id}" style="flex: 1;">
+                    ${Icons.clock('', 12)} Timed Exam
+                  </button>
+                `}
               </div>
             </div>
           `;
         }).join('');
+
+        examsGrid.querySelectorAll('.btn-dash-import').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            this.openImportModal(id);
+          });
+        });
+
+        examsGrid.querySelectorAll('.btn-dash-add-q').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const id = e.currentTarget.dataset.id;
+            this.openAddQuestionModal(id);
+          });
+        });
 
         examsGrid.querySelectorAll('.btn-dash-practice').forEach(btn => {
           btn.addEventListener('click', (e) => {
@@ -2265,8 +2288,9 @@ class QuizProApp {
     }
 
     document.getElementById('modalAddQuestion')?.classList.remove('open');
-    if (this.currentView === 'exams') this.renderExamsCatalog();
-    else if (this.currentView === 'question_bank') this.renderQuestionBank();
+    this.renderDashboard();
+    this.renderExamsCatalog();
+    this.renderQuestionBank();
   }
 
   // --- Student Profile Modal ---
@@ -2426,7 +2450,17 @@ class QuizProApp {
 
     document.getElementById('modalAddExam')?.classList.remove('open');
     this.showToast('Exam saved successfully', 'success');
-    this.switchView('exams');
+
+    // Instantly refresh all views without requiring any browser reload
+    this.renderDashboard();
+    this.renderExamsCatalog();
+    this.renderQuestionBank();
+
+    if (this.currentView === 'dashboard') {
+      this.renderDashboard();
+    } else {
+      this.switchView('exams');
+    }
   }
 
   // --- Global Event Listeners ---
