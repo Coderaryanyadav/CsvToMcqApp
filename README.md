@@ -136,10 +136,8 @@ Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation A,Explan
 
 ## 💾 Local Storage & Privacy
 
-- **100% Offline-First**: All data is stored locally on the user's device using
-  JSON files in the application documents directory (`mcq_data/`).
-- **No Remote Telemetry**: The app does not transmit exam data, student
-  profiles, or test answers to external servers.
+- **100% Offline-First (User Data)**: All user data (student profiles, exams, question banks, progress) is stored locally on the user's device using JSON files in the application documents directory (`mcq_data/`).
+- **Privacy Policy & Ad Integration**: The app includes an in-app Privacy Policy to comply with Google Play Store guidelines. While core functionality is completely offline, the app integrates the **Google Mobile Ads SDK (AdMob)**, which may collect device identifiers (like the Advertising ID), IP addresses, and crash logs for ad delivery and analytics purposes.
 - **Atomic Persistence**: Disk writes utilize temporary staging files and atomic
   replacement to guard against corruption.
 - **Portable Backups**: Users can export full backups or reset all application
