@@ -6,6 +6,7 @@ import { Auth } from './auth.js';
 import { Sound } from './sound.js';
 import { ConfettiCelebration } from './confetti.js';
 import { Supabase } from './supabaseClient.js';
+import { Icons } from './icons.js';
 
 class QuizProApp {
   constructor() {
@@ -18,8 +19,39 @@ class QuizProApp {
   init() {
     this.initTheme();
     this.initEventListeners();
+    if (this.checkAuthenticationGate()) {
+      this.renderHeaderInfo();
+      this.switchView('exams');
+    }
+  }
+
+  checkAuthenticationGate() {
+    const isAuth = Auth.isAuthenticated();
+    const modal = document.getElementById('modalAuth');
+    const closeBtn = document.getElementById('btnAuthClose');
+
+    if (!isAuth) {
+      if (modal) {
+        modal.classList.add('open', 'modal-locked');
+        if (closeBtn) closeBtn.style.display = 'none';
+        this.switchAuthTab('login');
+      }
+      return false;
+    } else {
+      if (modal) {
+        modal.classList.remove('open', 'modal-locked');
+        if (closeBtn) closeBtn.style.display = 'inline-flex';
+      }
+      return true;
+    }
+  }
+
+  onAuthSuccess(message = 'Authenticated successfully') {
+    const modal = document.getElementById('modalAuth');
+    modal?.classList.remove('open', 'modal-locked');
     this.renderHeaderInfo();
-    this.switchView('exams');
+    this.renderExamsCatalog();
+    this.showToast(message, 'success');
   }
 
   // --- Themes ---
@@ -58,15 +90,24 @@ class QuizProApp {
     const streakEl = document.getElementById('activeStreakDisplay');
     const btnHeaderLogin = document.getElementById('btnHeaderLogin');
 
-    if (avatarEl) avatarEl.textContent = user.avatarEmoji || '🎓';
-    if (nameEl) {
-      if (isRegistered) {
-        nameEl.textContent = user.name || 'Scholar';
-      } else {
-        nameEl.innerHTML = `${this.escapeHtml(user.name || 'Guest')} <span class="guest-tag">Guest</span>`;
-      }
+    const initials = (user.name || 'User')
+      .split(' ')
+      .filter(Boolean)
+      .map(n => n[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+
+    if (avatarEl) {
+      avatarEl.textContent = initials || 'AY';
+      avatarEl.classList.add('avatar-initials');
     }
-    if (streakEl) streakEl.textContent = `🔥 ${streak.currentStreak || 0}d`;
+    if (nameEl) {
+      nameEl.textContent = user.name || 'Scholar';
+    }
+    if (streakEl) {
+      streakEl.innerHTML = `${Icons.flame('', 13)} <span>${streak.currentStreak || 0}d streak</span>`;
+    }
     if (btnHeaderLogin) {
       btnHeaderLogin.style.display = isRegistered ? 'none' : 'inline-flex';
     }
@@ -78,22 +119,29 @@ class QuizProApp {
     const menuLogoutBtn = document.getElementById('menuBtnLogout');
     const menuSwitchBtn = document.getElementById('menuBtnSwitchAccount');
 
-    if (menuAvatar) menuAvatar.textContent = user.avatarEmoji || '🎓';
-    if (menuName) menuName.textContent = user.name || 'Student';
-    if (menuEmail) menuEmail.textContent = isRegistered ? user.email : 'Guest Session (Sign in to sync)';
-    if (menuLogoutBtn) menuLogoutBtn.textContent = isRegistered ? '🚪 Sign Out' : '🚪 End Guest Session';
-    if (menuSwitchBtn) menuSwitchBtn.textContent = isRegistered ? '🔄 Switch Account' : '🔑 Log In / Register';
+    if (menuAvatar) {
+      menuAvatar.textContent = initials || 'AY';
+      menuAvatar.classList.add('avatar-initials');
+    }
+    if (menuName) menuName.textContent = user.name || 'Scholar';
+    if (menuEmail) menuEmail.textContent = user.email || 'scholar@quizpro.local';
+    if (menuLogoutBtn) menuLogoutBtn.innerHTML = `${Icons.arrowLeft('', 14)} Sign Out`;
+    if (menuSwitchBtn) menuSwitchBtn.innerHTML = `${Icons.lock('', 14)} Switch Account`;
 
     // Sound toggle state
     const soundBtn = document.getElementById('btnSoundToggle');
     if (soundBtn) {
-      soundBtn.textContent = Sound.enabled ? '🔊' : '🔇';
+      soundBtn.innerHTML = Sound.enabled ? Icons.volume('', 15) : Icons.volumeMute('', 15);
       soundBtn.title = Sound.enabled ? 'Mute Sound Effects' : 'Enable Sound Effects';
     }
   }
 
   // --- Router / View Switching ---
   switchView(viewName, params = {}) {
+    if (!this.checkAuthenticationGate()) {
+      return;
+    }
+
     // Teardown active exam engine if navigating away from quiz/exam
     if (this.activeEngine && viewName !== 'practice' && viewName !== 'exam') {
       this.activeEngine.destroy();
@@ -149,16 +197,18 @@ class QuizProApp {
 
     if (exams.length === 0) {
       container.innerHTML = `
-        <div style="grid-column: 1/-1; text-align: center; padding: 4rem 1.5rem; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-xl);">
-          <div style="font-size: 3.5rem; margin-bottom: 1rem;">📂</div>
-          <h2 style="font-size: 1.4rem; font-weight: 800; margin-bottom: 0.5rem;">No Examinations Yet</h2>
-          <p style="color: var(--text-muted); margin-bottom: 1.75rem; max-width: 480px; margin-left: auto; margin-right: auto;">
-            Get started by creating your custom exam, importing questions from CSV or Excel, or try a 5-question demo test.
+        <div style="grid-column: 1/-1; text-align: center; padding: 4.5rem 1.5rem; background: var(--bg-card); border: 1px dashed var(--border-color); border-radius: var(--radius-xl);">
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 64px; height: 64px; border-radius: 50%; background: var(--bg-subtle); border: 1px solid var(--border-color); margin-bottom: 1.25rem; color: var(--text-muted);">
+            ${Icons.book('', 28)}
+          </div>
+          <h2 style="font-size: 1.3rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.015em;">No Examinations in Repository</h2>
+          <p style="color: var(--text-muted); margin-bottom: 1.75rem; max-width: 440px; margin-left: auto; margin-right: auto; font-size: 0.9rem; line-height: 1.6;">
+            Create your custom examination, import questions from CSV or Excel, or quickly load a sample certification test to get started.
           </p>
           <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
-            <button class="btn btn-primary" id="btnEmptyCreateExam">+ Create First Exam</button>
-            <button class="btn btn-secondary" id="btnEmptyImportExam">📂 Import Questions File</button>
-            <button class="btn btn-outline-primary" id="btnEmptyLoadSample">✨ Load Sample Test (Instant)</button>
+            <button class="btn btn-primary" id="btnEmptyCreateExam">${Icons.plus('', 14)} Create First Exam</button>
+            <button class="btn btn-secondary" id="btnEmptyImportExam">${Icons.upload('', 14)} Import Questions File</button>
+            <button class="btn btn-secondary" id="btnEmptyLoadSample">${Icons.sparkles('', 14)} Load Sample Test</button>
           </div>
         </div>
       `;
@@ -185,28 +235,28 @@ class QuizProApp {
             <div class="exam-card-header">
               <span class="exam-category-tag">${this.escapeHtml(exam.category || 'General')}</span>
               <div style="display: flex; gap: 0.35rem;">
-                <button class="icon-btn btn-sm btn-card-add-q" title="Add Question to Exam" data-id="${exam.id}">➕</button>
-                <button class="icon-btn btn-sm btn-edit-exam" title="Edit Exam Settings" data-id="${exam.id}">✏️</button>
-                <button class="icon-btn btn-sm btn-delete-exam" title="Delete Exam" data-id="${exam.id}">🗑️</button>
+                <button class="icon-btn btn-sm btn-card-add-q" title="Add Question to Exam" data-id="${exam.id}">${Icons.plus('', 13)}</button>
+                <button class="icon-btn btn-sm btn-edit-exam" title="Edit Exam Settings" data-id="${exam.id}">${Icons.edit('', 13)}</button>
+                <button class="icon-btn btn-sm btn-delete-exam" title="Delete Exam" data-id="${exam.id}">${Icons.trash('', 13)}</button>
               </div>
             </div>
             <h3 class="exam-card-title">${this.escapeHtml(exam.name)}</h3>
             <p class="exam-card-desc">${this.escapeHtml(exam.description || 'No description provided.')}</p>
             
             <div class="exam-meta-pills">
-              <span class="meta-pill">📋 ${qCount} Questions</span>
-              <span class="meta-pill">⏱️ ${exam.defaultDuration ? exam.defaultDuration + ' Min' : 'Untimed'}</span>
-              <span class="meta-pill">🎯 Pass: ${exam.passingPercentage}%</span>
-              ${attemptsCount > 0 ? `<span class="meta-pill" style="color: var(--accent-blue)">⭐ Best: ${bestScore}% (${attemptsCount} test${attemptsCount > 1 ? 's' : ''})</span>` : ''}
+              <span class="meta-pill">${Icons.database('', 12)} ${qCount} Questions</span>
+              <span class="meta-pill">${Icons.clock('', 12)} ${exam.defaultDuration ? exam.defaultDuration + ' Min' : 'Untimed'}</span>
+              <span class="meta-pill">${Icons.target('', 12)} Pass: ${exam.passingPercentage}%</span>
+              ${attemptsCount > 0 ? `<span class="meta-pill" style="color: var(--accent-blue)">${Icons.star('', 12, true)} Best: ${bestScore}% (${attemptsCount} test${attemptsCount > 1 ? 's' : ''})</span>` : ''}
             </div>
           </div>
 
           <div class="exam-card-actions">
             <button class="btn btn-secondary btn-practice-exam" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'title="Add questions to start practice"' : ''}>
-              📘 Practice
+              ${Icons.play('', 12)} Practice
             </button>
             <button class="btn btn-primary btn-take-exam" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'title="Add questions to start timed test"' : ''}>
-              ⏱️ Timed Exam
+              ${Icons.clock('', 12)} Timed Exam
             </button>
           </div>
         </div>
@@ -1511,9 +1561,9 @@ class QuizProApp {
     document.getElementById('menuBtnLogout')?.addEventListener('click', () => {
       dropdownMenu?.classList.remove('show');
       Auth.logout();
-      this.showToast('You have been logged out', 'info');
+      this.showToast('You have been signed out', 'info');
       this.renderHeaderInfo();
-      this.openAuthModal('login');
+      this.checkAuthenticationGate();
     });
 
     // Header Login Button
@@ -1551,10 +1601,7 @@ class QuizProApp {
 
       try {
         await Auth.login({ email, password: pass });
-        document.getElementById('modalAuth')?.classList.remove('open');
-        this.renderHeaderInfo();
-        this.renderExamsCatalog();
-        this.showToast('Welcome back!', 'success');
+        this.onAuthSuccess('Welcome back to QuizPro!');
       } catch (err) {
         this.setAuthAlert(err.message, 'error');
       }
@@ -1571,10 +1618,7 @@ class QuizProApp {
 
       try {
         await Auth.register({ name, email, password: pass, avatarEmoji: emoji, targetExam });
-        document.getElementById('modalAuth')?.classList.remove('open');
-        this.renderHeaderInfo();
-        this.renderExamsCatalog();
-        this.showToast('Account created successfully!', 'success');
+        this.onAuthSuccess('Account registered successfully! Welcome to QuizPro.');
       } catch (err) {
         this.setAuthAlert(err.message, 'error');
       }
@@ -1591,26 +1635,15 @@ class QuizProApp {
             email: 'demo@quizpro.dev',
             password: 'Password123!',
             avatarEmoji: '🚀',
-            targetExam: 'Certifications'
+            targetExam: 'Cloud Certifications'
           });
         } else {
           await Auth.login({ email: 'demo@quizpro.dev', password: 'Password123!' });
         }
-        document.getElementById('modalAuth')?.classList.remove('open');
-        this.renderHeaderInfo();
-        this.renderExamsCatalog();
-        this.showToast('Logged in as Demo User (Alex Rivera)', 'success');
+        this.onAuthSuccess('Signed in as Demo Scholar (Alex Rivera)');
       } catch (err) {
         this.setAuthAlert(err.message, 'error');
       }
-    });
-
-    // Continue as Guest button
-    document.getElementById('btnContinueGuest')?.addEventListener('click', () => {
-      Auth.loginAsGuest();
-      document.getElementById('modalAuth')?.classList.remove('open');
-      this.renderHeaderInfo();
-      this.showToast('Logged in as Guest', 'info');
     });
 
     // Hero buttons

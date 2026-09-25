@@ -41,7 +41,8 @@ class AuthService {
   }
 
   isAuthenticated() {
-    return this.getActiveUser() !== null;
+    const user = this.getActiveUser();
+    return user !== null && !user.isGuest;
   }
 
   async register({ name, email, password, avatarEmoji = '🎓', targetExam = 'General' }) {

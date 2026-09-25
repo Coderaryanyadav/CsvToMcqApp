@@ -267,16 +267,28 @@ For detailed release checklists and deployment instructions, see
 
 The full-featured web application is deployed and hosted live on Vercel:
 
-🚀 **Production Web App**: [https://web-sandy-five-55.vercel.app](https://web-sandy-five-55.vercel.app)
+🚀 **Production Web App**:
+[https://web-sandy-five-55.vercel.app](https://web-sandy-five-55.vercel.app)
 
 ### Web App Highlights
-- **Zero Preloaded Dummy Data**: Starts with a pure clean slate; optionally click `✨ Load Sample Test` for instant 1-click feature exploration.
-- **Client-Side SHA-256 Authentication**: Secure account registration and login using browser native Web Crypto API with persistent encrypted vault storage, guest mode (`⚡ Continue as Guest`), and a `🎯 Try Demo Account` button.
-- **☁️ Supabase Cloud Database Integration**: Connect your Supabase PostgreSQL database to sync exams, test banks, and attempt histories to the cloud.
-- **🎉 Canvas Confetti Celebrations**: High-velocity multi-angle particle explosions triggered upon passing examinations and reaching study milestones.
-- **🔊 Web Audio API Synthesizer**: Pure programmatic audio chimes for correct answers, buzzers for mistakes, and fanfare on test completion (toggleable with `🔊`).
-- **Interactive Practice Arena & Timed Simulator**: Real-time option validation, bookmarking, elimination strikethroughs, and desktop keyboard navigation (`1-4`, `A-D`, `Arrow keys`, `Enter`, `M`, `B`).
-- **Data Portability**: Full JSON backup export and restore compatible across web and desktop platforms.
+
+- **Zero Preloaded Dummy Data**: Starts with a pure clean slate; optionally
+  click `✨ Load Sample Test` for instant 1-click feature exploration.
+- **Client-Side SHA-256 Authentication**: Secure account registration and login
+  using browser native Web Crypto API with persistent encrypted vault storage,
+  guest mode (`⚡ Continue as Guest`), and a `🎯 Try Demo Account` button.
+- **☁️ Supabase Cloud Database Integration**: Connect your Supabase PostgreSQL
+  database to sync exams, test banks, and attempt histories to the cloud.
+- **🎉 Canvas Confetti Celebrations**: High-velocity multi-angle particle
+  explosions triggered upon passing examinations and reaching study milestones.
+- **🔊 Web Audio API Synthesizer**: Pure programmatic audio chimes for correct
+  answers, buzzers for mistakes, and fanfare on test completion (toggleable with
+  `🔊`).
+- **Interactive Practice Arena & Timed Simulator**: Real-time option validation,
+  bookmarking, elimination strikethroughs, and desktop keyboard navigation
+  (`1-4`, `A-D`, `Arrow keys`, `Enter`, `M`, `B`).
+- **Data Portability**: Full JSON backup export and restore compatible across
+  web and desktop platforms.
 
 ---
 
@@ -285,25 +297,35 @@ The full-featured web application is deployed and hosted live on Vercel:
 QuizPro supports optional cloud persistence using **Supabase** (PostgreSQL):
 
 ### 1. Database Schema Setup
-Run the SQL schema located in [`supabase/schema.sql`](supabase/schema.sql) in your Supabase project:
-1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) -> Select your Project.
+
+Run the SQL schema located in [`supabase/schema.sql`](supabase/schema.sql) in
+your Supabase project:
+
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) -> Select
+   your Project.
 2. Navigate to **SQL Editor** -> **New Query**.
-3. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
+3. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and click
+   **Run**.
 
 ### 2. Supported Tables
-- `exams`: Examination catalog, durations, passing thresholds, and JSONB question banks.
+
+- `exams`: Examination catalog, durations, passing thresholds, and JSONB
+  question banks.
 - `students`: Profile metadata, target exam goals, avatars, and guest flags.
-- `performances`: Chronological test attempts, scores, time spent, and answer audits.
+- `performances`: Chronological test attempts, scores, time spent, and answer
+  audits.
 - `bookmarks`: Question bookmarks per student.
 - `streaks`: Daily study streak tracking.
 
 ### 3. Connecting to Supabase in the Web App
+
 1. Open QuizPro Web -> Click **⚙️ Settings** in the top navigation.
 2. Under **☁️ Supabase Cloud Database**, enter your:
    - **Project URL** (e.g. `https://your-project.supabase.co`)
    - **Anon Public Key** (`eyJhbGci...`)
 3. Click **💾 Save Config** then **⚡ Test Connection**.
-4. Use **⬆️ Push to Cloud** to upload your local exams, or **⬇️ Pull from Cloud** to download your cloud question banks to any device.
+4. Use **⬆️ Push to Cloud** to upload your local exams, or **⬇️ Pull from
+   Cloud** to download your cloud question banks to any device.
 
 ---
 
@@ -321,6 +343,7 @@ vercel --prod
 ```
 
 Or deploy directly from the repository root:
+
 ```bash
 npx vercel web --prod --yes
 ```
