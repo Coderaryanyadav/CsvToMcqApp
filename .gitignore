@@ -23,6 +23,9 @@ app.*.map.json
 # ---------------------------------------------------------
 # Environment & Secrets (Never commit secrets)
 # ---------------------------------------------------------
+.vercel
+.vercel/
+**/.vercel/
 .env
 .env.*
 !.env.example

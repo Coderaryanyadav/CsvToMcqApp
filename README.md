@@ -2,11 +2,15 @@
 
 [![Flutter CI](https://github.com/Coderaryanyadav/CsvToMcqApp/actions/workflows/flutter.yml/badge.svg)](https://github.com/Coderaryanyadav/CsvToMcqApp/actions/workflows/flutter.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](README.md)
+[![Platform](https://img.shields.io/badge/Platform-Web%20%7C%20Android%20%7C%20iOS%20%7C%20macOS%20%7C%20Windows-lightgrey.svg)](README.md)
+[![Live Web App](https://img.shields.io/badge/Live%20Web%20App-Vercel-black?style=for-the-badge&logo=vercel)](https://web-sandy-five-55.vercel.app)
 
-**QuizPro** is an offline-first, cross-platform Flutter application designed for
-certification exams, standardized test preparation, and custom question banks
-(e.g. AWS, CIA, CISA, SQL, and personalized curriculums).
+**QuizPro** is a modern, cross-platform MCQ examination simulator and practice
+application (available on the
+**[Live Web App](https://web-sandy-five-55.vercel.app)**, Android, iOS, macOS,
+Windows, and Linux). Designed for certification exams, standardized test
+preparation, and custom question banks (e.g. AWS, CIA, CISA, SQL, and
+personalized curriculums).
 
 It combines a multi-student profile system, safe atomic local persistence,
 resilient CSV/Excel import, timed and untimed exam simulation, interactive
@@ -136,8 +140,14 @@ Question,Option A,Option B,Option C,Option D,Correct Answer,Explanation A,Explan
 
 ## 💾 Local Storage & Privacy
 
-- **100% Offline-First (User Data)**: All user data (student profiles, exams, question banks, progress) is stored locally on the user's device using JSON files in the application documents directory (`mcq_data/`).
-- **Privacy Policy & Ad Integration**: The app includes an in-app Privacy Policy to comply with Google Play Store guidelines. While core functionality is completely offline, the app integrates the **Google Mobile Ads SDK (AdMob)**, which may collect device identifiers (like the Advertising ID), IP addresses, and crash logs for ad delivery and analytics purposes.
+- **100% Offline-First (User Data)**: All user data (student profiles, exams,
+  question banks, progress) is stored locally on the user's device using JSON
+  files in the application documents directory (`mcq_data/`).
+- **Privacy Policy & Ad Integration**: The app includes an in-app Privacy Policy
+  to comply with Google Play Store guidelines. While core functionality is
+  completely offline, the app integrates the **Google Mobile Ads SDK (AdMob)**,
+  which may collect device identifiers (like the Advertising ID), IP addresses,
+  and crash logs for ad delivery and analytics purposes.
 - **Atomic Persistence**: Disk writes utilize temporary staging files and atomic
   replacement to guard against corruption.
 - **Portable Backups**: Users can export full backups or reset all application
@@ -250,6 +260,70 @@ flutter build windows --release
 
 For detailed release checklists and deployment instructions, see
 [docs/releasing.md](docs/releasing.md).
+
+---
+
+## 🌐 Live Web Application (Vercel)
+
+The full-featured web application is deployed and hosted live on Vercel:
+
+🚀 **Production Web App**: [https://web-sandy-five-55.vercel.app](https://web-sandy-five-55.vercel.app)
+
+### Web App Highlights
+- **Zero Preloaded Dummy Data**: Starts with a pure clean slate; optionally click `✨ Load Sample Test` for instant 1-click feature exploration.
+- **Client-Side SHA-256 Authentication**: Secure account registration and login using browser native Web Crypto API with persistent encrypted vault storage, guest mode (`⚡ Continue as Guest`), and a `🎯 Try Demo Account` button.
+- **☁️ Supabase Cloud Database Integration**: Connect your Supabase PostgreSQL database to sync exams, test banks, and attempt histories to the cloud.
+- **🎉 Canvas Confetti Celebrations**: High-velocity multi-angle particle explosions triggered upon passing examinations and reaching study milestones.
+- **🔊 Web Audio API Synthesizer**: Pure programmatic audio chimes for correct answers, buzzers for mistakes, and fanfare on test completion (toggleable with `🔊`).
+- **Interactive Practice Arena & Timed Simulator**: Real-time option validation, bookmarking, elimination strikethroughs, and desktop keyboard navigation (`1-4`, `A-D`, `Arrow keys`, `Enter`, `M`, `B`).
+- **Data Portability**: Full JSON backup export and restore compatible across web and desktop platforms.
+
+---
+
+## ☁️ Supabase Cloud Database Integration
+
+QuizPro supports optional cloud persistence using **Supabase** (PostgreSQL):
+
+### 1. Database Schema Setup
+Run the SQL schema located in [`supabase/schema.sql`](supabase/schema.sql) in your Supabase project:
+1. Go to your [Supabase Dashboard](https://supabase.com/dashboard) -> Select your Project.
+2. Navigate to **SQL Editor** -> **New Query**.
+3. Paste the contents of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
+
+### 2. Supported Tables
+- `exams`: Examination catalog, durations, passing thresholds, and JSONB question banks.
+- `students`: Profile metadata, target exam goals, avatars, and guest flags.
+- `performances`: Chronological test attempts, scores, time spent, and answer audits.
+- `bookmarks`: Question bookmarks per student.
+- `streaks`: Daily study streak tracking.
+
+### 3. Connecting to Supabase in the Web App
+1. Open QuizPro Web -> Click **⚙️ Settings** in the top navigation.
+2. Under **☁️ Supabase Cloud Database**, enter your:
+   - **Project URL** (e.g. `https://your-project.supabase.co`)
+   - **Anon Public Key** (`eyJhbGci...`)
+3. Click **💾 Save Config** then **⚡ Test Connection**.
+4. Use **⬆️ Push to Cloud** to upload your local exams, or **⬇️ Pull from Cloud** to download your cloud question banks to any device.
+
+---
+
+## 🚀 Deployment Instructions (Vercel)
+
+To deploy the web app to your own Vercel account:
+
+```bash
+# 1. Install Vercel CLI (or use npx)
+npm install -g vercel
+
+# 2. Deploy from the web directory
+cd web
+vercel --prod
+```
+
+Or deploy directly from the repository root:
+```bash
+npx vercel web --prod --yes
+```
 
 ---
 
