@@ -62,25 +62,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final fullData = await StorageService.exportFullBackupData();
       final jsonText = const JsonEncoder.withIndent('  ').convert(fullData);
-      final outputFile = await FilePicker.platform.saveFile(
-        dialogTitle: 'Save Full QuizPro Backup Package',
-        fileName:
-            'QuizPro_Full_Backup_${DateTime.now().millisecondsSinceEpoch}.json',
-        type: FileType.custom,
-        allowedExtensions: ['json'],
-      );
+      String? savedPath;
 
-      if (outputFile != null) {
-        final file = File(outputFile);
-        await file.writeAsString(jsonText);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Complete package exported successfully!'),
-              backgroundColor: AppTheme.success,
-            ),
-          );
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        savedPath = await FilePicker.platform.saveFile(
+          dialogTitle: 'Save Full QuizPro Backup Package',
+          fileName:
+              'QuizPro_Full_Backup_${DateTime.now().millisecondsSinceEpoch}.json',
+          type: FileType.custom,
+          allowedExtensions: ['json'],
+        );
+        if (savedPath != null) {
+          final file = File(savedPath);
+          await file.writeAsString(jsonText);
         }
+      } else {
+        savedPath = await BackupService.exportBackupToFile();
+      }
+
+      if (savedPath != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Backup saved successfully: $savedPath'),
+            backgroundColor: AppTheme.success,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -626,13 +633,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 // 5. ABOUT SECTION
                 _sectionHeader('About', Icons.info_outline),
-                const Card(
+                Card(
                   child: Padding(
-                    padding: EdgeInsets.all(20),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Text(
                               'QuizPro Exam Simulator',
@@ -650,13 +657,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          'Data is stored locally on your device by the application and is not uploaded to any remote servers.',
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Your question banks and exam history are stored locally on your device in offline storage.',
                           style: TextStyle(
                             fontSize: 13,
                             color: AppTheme.secondaryText,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton.icon(
+                          icon: const Icon(Icons.shield_outlined, size: 16),
+                          label: const Text('Privacy Policy & Data Safety'),
+                          style: OutlinedButton.styleFrom(
+                            visualDensity: VisualDensity.compact,
+                          ),
+                          onPressed: () => _showPrivacyPolicyDialog(context),
                         ),
                       ],
                     ),
@@ -716,6 +732,47 @@ class _SettingsScreenState extends State<SettingsScreen> {
               fontWeight: FontWeight.bold,
               letterSpacing: 0.2,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyPolicyDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.shield_outlined, color: AppTheme.accentBlue),
+            SizedBox(width: 8),
+            Text('Privacy Policy & Data Safety'),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'QuizPro Data Safety Disclosure',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              ),
+              SizedBox(height: 12),
+              Text(
+                '• 100% Offline Local Storage:\nAll exams, question banks, study performance metrics, bookmarks, and student profiles are stored exclusively on your device in offline JSON format. QuizPro does not transmit your exam content to remote servers.\n\n'
+                '• Advertising & Network Services:\nQuizPro integrates the Google Mobile Ads SDK to display banner advertisements. Google AdMob and its advertising partners may collect and process device identifiers (including Google Advertising ID / AD_ID), IP addresses, and diagnostic crash data to serve ads in compliance with Google Privacy Policy.\n\n'
+                '• No Account Required:\nQuizPro does not require any account creation or personal sign-up.\n\n'
+                '• Data Portability & Complete Erasure:\nYou retain full ownership of your data. You can export complete backups anytime or permanently wipe all local database files using the Danger Zone controls.',
+                style: TextStyle(fontSize: 13, height: 1.45),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
           ),
         ],
       ),

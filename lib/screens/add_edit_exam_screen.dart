@@ -308,50 +308,58 @@ class _AddEditExamScreenState extends State<AddEditExamScreen>
               final pctCtrl = TextEditingController(
                   text: exam.passingPercentage.toString());
               final nameCtrl = TextEditingController(text: exam.name);
-              final ok = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Exam Settings'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                        controller: nameCtrl,
-                        decoration:
-                            const InputDecoration(labelText: 'Exam name'),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: pctCtrl,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Passing Percentage',
-                          hintText: 'e.g. 75',
+              final bool? ok;
+              String inputName = '';
+              String inputPct = '';
+              try {
+                ok = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Exam Settings'),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextField(
+                          controller: nameCtrl,
+                          decoration:
+                              const InputDecoration(labelText: 'Exam name'),
                         ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: pctCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            labelText: 'Passing Percentage',
+                            hintText: 'e.g. 75',
+                          ),
+                        ),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Save'),
                       ),
                     ],
                   ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, false),
-                      child: const Text('Cancel'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              );
+                );
+                inputName = nameCtrl.text.trim();
+                inputPct = pctCtrl.text.trim();
+              } finally {
+                pctCtrl.dispose();
+                nameCtrl.dispose();
+              }
               if (!mounted) return;
               if (ok == true) {
-                final newPct = int.tryParse(pctCtrl.text.trim());
+                final newPct = int.tryParse(inputPct);
                 if (newPct != null && newPct >= 1 && newPct <= 100) {
                   setState(() {
                     exam.passingPercentage = newPct;
-                    exam.name = nameCtrl.text.trim().isEmpty
-                        ? exam.name
-                        : nameCtrl.text.trim();
+                    exam.name = inputName.isEmpty ? exam.name : inputName;
                   });
                   await _save();
                 } else {

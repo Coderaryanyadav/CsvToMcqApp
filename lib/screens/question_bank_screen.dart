@@ -671,7 +671,20 @@ class _QuestionBankScreenState extends State<QuestionBankScreen> {
           },
         );
       },
-    );
+    ).whenComplete(() {
+      qCtrl.dispose();
+      optACtrl.dispose();
+      optBCtrl.dispose();
+      optCCtrl.dispose();
+      optDCtrl.dispose();
+      expACtrl.dispose();
+      expBCtrl.dispose();
+      expCCtrl.dispose();
+      expDCtrl.dispose();
+      chapterCtrl.dispose();
+      topicCtrl.dispose();
+      tagsCtrl.dispose();
+    });
   }
 
   Widget _buildOptionInput({

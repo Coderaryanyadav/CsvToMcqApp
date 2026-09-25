@@ -90,33 +90,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _createExamDialog() async {
     final nameCtrl = TextEditingController();
-    final created = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add New Exam'),
-        content: TextField(
-          controller: nameCtrl,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Exam Code / Title (e.g. CIA, CISA, SQL, AWS)',
-            hintText: 'e.g. AWS Solutions Architect',
+    final String? created;
+    try {
+      created = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Add New Exam'),
+          content: TextField(
+            controller: nameCtrl,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Exam Code / Title (e.g. CIA, CISA, SQL, AWS)',
+              hintText: 'e.g. AWS Solutions Architect',
+            ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final val = nameCtrl.text.trim();
+                if (val.isNotEmpty) Navigator.pop(ctx, val);
+              },
+              child: const Text('Create Exam'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final val = nameCtrl.text.trim();
-              if (val.isNotEmpty) Navigator.pop(ctx, val);
-            },
-            child: const Text('Create Exam'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      nameCtrl.dispose();
+    }
 
     if (created != null && created.isNotEmpty) {
       final newExam = Exam(
@@ -220,47 +225,55 @@ class _HomeScreenState extends State<HomeScreen> {
     final nameCtrl = TextEditingController(text: exam.name);
     final pctCtrl =
         TextEditingController(text: exam.passingPercentage.toString());
-    final saved = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Exam Details'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Exam Title',
+    final bool? saved;
+    String newName = '';
+    int newPct = exam.passingPercentage;
+
+    try {
+      saved = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Edit Exam Details'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Exam Title',
+                ),
               ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: pctCtrl,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Passing Score (%)',
+                  hintText: 'e.g. 70',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: pctCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Passing Score (%)',
-                hintText: 'e.g. 70',
-              ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Save Changes'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Save Changes'),
-          ),
-        ],
-      ),
-    );
+      );
+      newName = nameCtrl.text.trim();
+      newPct = int.tryParse(pctCtrl.text.trim()) ?? exam.passingPercentage;
+    } finally {
+      nameCtrl.dispose();
+      pctCtrl.dispose();
+    }
 
     if (saved == true) {
-      final newName = nameCtrl.text.trim();
-      final newPct =
-          int.tryParse(pctCtrl.text.trim()) ?? exam.passingPercentage;
       if (newName.isNotEmpty) {
         exam.name = newName;
         exam.passingPercentage = newPct.clamp(1, 100);

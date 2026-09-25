@@ -14,9 +14,16 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  final String _adUnitId = (!kIsWeb && Platform.isAndroid)
-      ? 'ca-app-pub-2385474220688514/9377281193'
-      : 'ca-app-pub-3940256099942544/2934735716';
+  String get _adUnitId {
+    if (kDebugMode) {
+      return (!kIsWeb && Platform.isAndroid)
+          ? 'ca-app-pub-3940256099942544/6300978111'
+          : 'ca-app-pub-3940256099942544/2934735716';
+    }
+    return (!kIsWeb && Platform.isAndroid)
+        ? 'ca-app-pub-2385474220688514/9377281193'
+        : 'ca-app-pub-3940256099942544/2934735716';
+  }
 
   @override
   void initState() {

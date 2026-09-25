@@ -312,8 +312,10 @@ class QuestionSelectionService {
     // 6. Shuffle options if enabled (preserves correct answers & explanation mappings)
     if (shuffleOptions) {
       list = list.map((origQ) {
-        final originalCorrectOptions =
-            origQ.correctAnswers.map((idx) => origQ.options[idx]).toSet();
+        final originalCorrectOptions = origQ.correctAnswers
+            .where((idx) => idx >= 0 && idx < origQ.options.length)
+            .map((idx) => origQ.options[idx])
+            .toSet();
         final optionsCopy = List<String>.from(origQ.options)..shuffle();
         final newCorrectAnswers = <int>{};
         final newExplanations = <int, String>{};

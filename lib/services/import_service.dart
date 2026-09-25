@@ -96,20 +96,20 @@ class ImportService {
         }
       }
       return Isolate.run(() => parseCsv(
-        text,
-        filename,
-        startQuestionNumber: startId,
-        existingQuestions: existingQuestions,
-        targetExamName: examName,
-      ));
+            text,
+            filename,
+            startQuestionNumber: startId,
+            existingQuestions: existingQuestions,
+            targetExamName: examName,
+          ));
     } else {
       return Isolate.run(() => parseExcel(
-        bytes,
-        filename,
-        startQuestionNumber: startId,
-        existingQuestions: existingQuestions,
-        targetExamName: examName,
-      ));
+            bytes,
+            filename,
+            startQuestionNumber: startId,
+            existingQuestions: existingQuestions,
+            targetExamName: examName,
+          ));
     }
   }
 
