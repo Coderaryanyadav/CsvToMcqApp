@@ -43,6 +43,10 @@ class StorageService {
     return Directory.current;
   }
 
+  static void invalidateCaches() {
+    _repo.invalidateCaches();
+  }
+
   // Student Profiles
   static Future<List<StudentProfile>> getAllStudents() async {
     return _repo.getAllStudents();

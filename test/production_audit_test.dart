@@ -22,6 +22,9 @@ class MockMemoryStorageRepository implements IStorageRepository {
   Future<void> init() async {}
 
   @override
+  void invalidateCaches() {}
+
+  @override
   Future<void> clearAllData() async {
     _exams.clear();
     _performances.clear();

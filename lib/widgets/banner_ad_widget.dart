@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
@@ -13,7 +14,7 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  final String _adUnitId = Platform.isAndroid
+  final String _adUnitId = (!kIsWeb && Platform.isAndroid)
       ? 'ca-app-pub-2385474220688514/9377281193'
       : 'ca-app-pub-3940256099942544/2934735716';
 
@@ -24,6 +25,10 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
   }
 
   void _loadAd() {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) {
+      return;
+    }
+
     _bannerAd = BannerAd(
       adUnitId: _adUnitId,
       request: const AdRequest(),

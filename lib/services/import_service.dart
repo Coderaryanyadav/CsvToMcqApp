@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:isolate';
 import 'package:excel/excel.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:csv/csv.dart';
@@ -94,21 +95,21 @@ class ImportService {
           text = String.fromCharCodes(bytes);
         }
       }
-      return parseCsv(
+      return Isolate.run(() => parseCsv(
         text,
         filename,
         startQuestionNumber: startId,
         existingQuestions: existingQuestions,
         targetExamName: examName,
-      );
+      ));
     } else {
-      return parseExcel(
+      return Isolate.run(() => parseExcel(
         bytes,
         filename,
         startQuestionNumber: startId,
         existingQuestions: existingQuestions,
         targetExamName: examName,
-      );
+      ));
     }
   }
 

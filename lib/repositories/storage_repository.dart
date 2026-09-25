@@ -1,10 +1,26 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import '../models/exam.dart';
 import '../models/performance.dart';
 import '../models/student_profile.dart';
+
+List<Exam> _parseExamsInBackground(List<String> contents) {
+  final List<Exam> exams = [];
+  for (final content in contents) {
+    try {
+      final json = jsonDecode(content);
+      if (json is Map<String, dynamic>) {
+        exams.add(Exam.fromJson(json));
+      }
+    } catch (_) {
+      // Skip malformed files gracefully
+    }
+  }
+  return exams;
+}
 
 abstract class IStorageRepository {
   Future<void> init();
@@ -43,6 +59,9 @@ abstract class IStorageRepository {
   // Full Backup & Restore
   Future<Map<String, dynamic>> exportFullBackupData();
   Future<void> restoreFullBackupData(Map<String, dynamic> data);
+
+  // Cache Management
+  void invalidateCaches();
 }
 
 class IoStorageRepository implements IStorageRepository {
@@ -216,10 +235,16 @@ class IoStorageRepository implements IStorageRepository {
     }
 
     // Invalidate caches to ensure clean fresh reload
+    invalidateCaches();
+  }
+
+  @override
+  void invalidateCaches() {
     _cachedExams = null;
     _cachedPerformances = null;
     _cachedStudents = null;
     _cachedSettings = null;
+    _cachedBookmarks.clear();
   }
 
   @override
@@ -229,7 +254,6 @@ class IoStorageRepository implements IStorageRepository {
       return List<Exam>.from(_cachedExams!);
     }
 
-    final List<Exam> exams = [];
     final entities = await mcqDir.list().toList();
     final files = entities.where((f) {
       if (f is! File) return false;
@@ -244,17 +268,16 @@ class IoStorageRepository implements IStorageRepository {
           filename != 'students.json';
     }).toList();
 
+    final List<String> contents = [];
     for (final f in files) {
       try {
         final content = await File(f.path).readAsString();
-        final json = jsonDecode(content);
-        if (json is Map<String, dynamic>) {
-          exams.add(Exam.fromJson(json));
-        }
-      } catch (_) {
-        // Skip malformed files gracefully
-      }
+        contents.add(content);
+      } catch (_) {}
     }
+
+    final exams = await compute(_parseExamsInBackground, contents);
+
     exams.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     _cachedExams = exams;
     return List<Exam>.from(exams);
