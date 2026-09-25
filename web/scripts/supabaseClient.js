@@ -4,7 +4,7 @@ const SUPABASE_CONFIG_KEY = 'quizpro_supabase_config_v3';
 // Default Supabase project configuration (can be configured in Settings)
 const DEFAULT_CONFIG = {
   url: 'https://kafhbffonnzgoagriwhf.supabase.co',
-  anonKey: 'sb_publishable_en0LYxGMHq360yXpkFqn7w_Kk046PlW',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthZmhiZmZvbm56Z29hZ3Jpd2hmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzNDM0MzUsImV4cCI6MjEwNTkxOTQzNX0.Yc4wpLG_oLyj6V-UCHOPtyX_rRs_LpZ2JeiW_AFLg3c',
   autoSync: true
 };
 
