@@ -3,8 +3,8 @@ const SUPABASE_CONFIG_KEY = 'quizpro_supabase_config_v3';
 
 // Default Supabase project configuration (can be configured in Settings)
 const DEFAULT_CONFIG = {
-  url: '',
-  anonKey: '',
+  url: 'https://kafhbffonnzgoagriwhf.supabase.co',
+  anonKey: 'sb_publishable_en0LYxGMHq360yXpkFqn7w_Kk046PlW',
   autoSync: true
 };
 
@@ -76,10 +76,10 @@ class SupabaseService {
     const { data, error } = await this.client.from('exams').select('id').limit(1);
     if (error) {
       // If table doesn't exist yet, but authentication was valid, report table guidance
-      if (error.code === '42P01') {
+      if (error.code === '42P01' || error.code === 'PGRST205') {
         return {
           success: true,
-          notice: 'Connected to Supabase! (Note: The "exams" table is not yet created. Run schema.sql in Supabase SQL Editor).'
+          notice: 'Connected to Supabase! (Note: The "exams" table is not yet created. Run schema.sql in your Supabase SQL Editor).'
         };
       }
       throw new Error(`Supabase Error (${error.code || 'ERR'}): ${error.message}`);
