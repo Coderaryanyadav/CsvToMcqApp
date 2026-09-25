@@ -43,28 +43,44 @@
         </div>
       </div>
 
-      <!-- Center App Navigation Tabs -->
+      <!-- Center App Navigation Tabs (Matching Flutter App) -->
       <nav class="app-nav">
-        <button class="nav-tab-btn active" data-view="exams">
-          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <button class="nav-tab-btn active" data-view="dashboard">
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          <span>Dashboard</span>
+        </button>
+        <button class="nav-tab-btn" data-view="exams">
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
           <span>Exams</span>
         </button>
         <button class="nav-tab-btn" data-view="question_bank">
-          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
           <span>Question Bank</span>
         </button>
+        <button class="nav-tab-btn" id="navBtnImport">
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Import</span>
+        </button>
+        <button class="nav-tab-btn" data-view="history">
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span>Practice History</span>
+        </button>
         <button class="nav-tab-btn" data-view="analytics">
-          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          <span>Analytics</span>
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          <span>Results</span>
         </button>
         <button class="nav-tab-btn" data-view="settings">
-          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <svg class="ui-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span>Settings</span>
         </button>
       </nav>
 
       <!-- Right Header Controls -->
       <div class="header-actions">
+        <button class="btn btn-primary btn-sm" id="btnHeaderNewExam">
+          <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Exam
+        </button>
         <div class="streak-chip" id="activeStreakDisplay" title="Current Daily Study Streak">
           <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
           <span>0d streak</span>
@@ -127,9 +143,100 @@
   <main class="main-content">
 
     <!-- ====================================================================
+         VIEW: DASHBOARD (REPLICA OF FLUTTER HOME SCREEN)
+         ==================================================================== -->
+    <section class="view-section active" id="view-dashboard">
+      <div class="workspace-header-bar" style="margin-bottom: 1.5rem;">
+        <div class="workspace-title-group">
+          <div class="workspace-breadcrumbs">
+            <span class="breadcrumb-root">Workspace</span>
+            <span class="breadcrumb-separator">/</span>
+            <span class="breadcrumb-current">Executive Overview</span>
+            <span class="status-indicator-live" title="Supabase Cloud Sync Active">
+              <span class="status-dot-pulse"></span>
+              Cloud Connected
+            </span>
+          </div>
+          <h1 class="workspace-heading" id="dashWelcomeTitle">Welcome to QuizPro! 🎓</h1>
+          <p class="workspace-subheading" id="dashWelcomeSub">Here is your active practice progress and performance overview.</p>
+        </div>
+        <div class="workspace-actions">
+          <button class="btn btn-secondary" id="btnDashQuickImport">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import Questions
+          </button>
+          <button class="btn btn-primary" id="btnDashNewExam">
+            <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Create Exam
+          </button>
+        </div>
+      </div>
+
+      <!-- KPI Metrics Cards (4 Metrics matching Flutter App) -->
+      <div class="stats-cards-grid" style="margin-bottom: 1.5rem;">
+        <div class="stat-card">
+          <div class="stat-card-title">Questions Answered</div>
+          <div class="stat-card-value" id="dashMetricAnswered">0</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-title">Average Accuracy</div>
+          <div class="stat-card-value" id="dashMetricAccuracy">0%</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-title">Total Study Time</div>
+          <div class="stat-card-value" id="dashMetricTime">0m</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-title">Current Study Streak</div>
+          <div class="stat-card-value" id="dashMetricStreak">0 Days 🔥</div>
+        </div>
+      </div>
+
+      <!-- Quick Practice Starred Questions Callout Banner -->
+      <div class="starred-callout-card" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.85rem;">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(245, 158, 11, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; color: #F59E0B;">
+            ⭐
+          </div>
+          <div>
+            <h4 style="margin: 0 0 0.25rem; font-size: 1.05rem; font-weight: 700; color: var(--text-main);">Practice Starred Questions</h4>
+            <p style="margin: 0; font-size: 0.84rem; color: var(--text-muted);">Focus only on challenging questions you starred during exams or practice sessions.</p>
+          </div>
+        </div>
+        <button class="btn btn-primary" id="btnDashPracticeStarred" style="background: #F59E0B; border-color: #F59E0B; color: #18181B; font-weight: 700;">
+          ⭐ Practice Starred (<span id="dashStarredCount">0</span>)
+        </button>
+      </div>
+
+      <!-- Recent Examinations Section -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.2rem;">Available Exam Tracks</h3>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Quickly launch practice or timed examination simulations</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnDashViewAllExams">View All Exams →</button>
+      </div>
+      <div class="exams-grid" id="dashExamsGrid" style="margin-bottom: 2.5rem;">
+        <!-- Injected dynamically -->
+      </div>
+
+      <!-- Recent Attempts Section -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0 0 0.2rem;">Recent Session Attempts</h3>
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Audit questions, view answer keys, or drill your incorrect answers</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" id="btnDashViewAllHistory">View Full History →</button>
+      </div>
+      <div id="dashRecentHistoryContainer">
+        <!-- Injected dynamically -->
+      </div>
+    </section>
+
+    <!-- ====================================================================
          VIEW: EXAMS CATALOG
          ==================================================================== -->
-    <section class="view-section active" id="view-exams">
+    <section class="view-section" id="view-exams">
       <!-- Executive Workspace Control Bar -->
       <div class="workspace-header-bar">
         <div class="workspace-title-group">
@@ -152,7 +259,7 @@
           </button>
           <button class="btn btn-secondary" id="btnOpenAddQuestionModal">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            + Question
+            Add Question
           </button>
           <button class="btn btn-primary" id="btnOpenCreateExamModal">
             <svg class="ui-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -211,15 +318,60 @@
         </div>
       </div>
 
-      <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
-        <input type="text" id="qbSearchInput" class="form-input" placeholder="Search by keyword, question, or topic..." style="flex: 2; min-width: 250px;">
-        <select id="qbCategoryFilter" class="form-select" style="flex: 1; min-width: 180px;">
+      <div style="display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center;">
+        <input type="text" id="qbSearchInput" class="form-input" placeholder="Search by keyword, question, or topic..." style="flex: 2; min-width: 220px;">
+        <select id="qbCategoryFilter" class="form-select" style="flex: 1; min-width: 160px;">
           <option value="all">All Examinations</option>
         </select>
+        <select id="qbTopicFilter" class="form-select" style="flex: 1; min-width: 150px;">
+          <option value="all">All Topics</option>
+        </select>
+        <select id="qbTypeFilter" class="form-select" style="flex: 1; min-width: 140px;">
+          <option value="all">All Types</option>
+          <option value="single">Single Choice</option>
+          <option value="multiple">Multiple Choice</option>
+          <option value="true_false">True / False</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" id="btnQbToggleStarred" style="font-weight: 600; white-space: nowrap;">
+          ⭐ Starred Only
+        </button>
       </div>
 
       <div id="qbListContainer">
         <!-- Injected dynamically -->
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW: PRACTICE & EXAM HISTORY (REPLICA OF FLUTTER HISTORY SCREEN)
+         ==================================================================== -->
+    <section class="view-section" id="view-history">
+      <div class="page-banner">
+        <div>
+          <h1 class="banner-title">Practice &amp; Exam History</h1>
+          <p class="banner-subtitle">
+            Review all past practice and exam simulation attempts, audit questions, and drill your mistakes.
+          </p>
+        </div>
+        <div class="banner-actions">
+          <button class="btn btn-secondary btn-sm" id="btnClearHistoryBtnHist">
+            <svg class="ui-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear History
+          </button>
+        </div>
+      </div>
+
+      <!-- History Filter Buttons -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap;">
+        <button type="button" class="btn btn-sm btn-primary hist-filter-btn" data-filter="all">All Attempts</button>
+        <button type="button" class="btn btn-sm btn-secondary hist-filter-btn" data-filter="exam">Exam Simulations</button>
+        <button type="button" class="btn btn-sm btn-secondary hist-filter-btn" data-filter="practice">Practice Sessions</button>
+        <button type="button" class="btn btn-sm btn-secondary hist-filter-btn" data-filter="passed">Passed</button>
+        <button type="button" class="btn btn-sm btn-secondary hist-filter-btn" data-filter="failed">Needs Review</button>
+      </div>
+
+      <div id="historyListContainer">
+        <!-- Rendered dynamically by app.js -->
       </div>
     </section>
 
@@ -500,6 +652,207 @@
         <button class="btn btn-secondary btn-close-modal">Cancel</button>
         <button class="btn btn-primary" id="btnConfirmImport" style="display: none;">
           Import Questions
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL: SESSION LAUNCHER & CONFIGURATION (REPLICA OF APP'S TAKE_EXAM_SCREEN)
+       ==================================================================== -->
+  <div class="modal-overlay" id="modalSessionLauncher">
+    <div class="modal-container modal-lg">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <h3 class="modal-title" id="sessionLauncherTitle">Start Assessment Session</h3>
+          <span class="q-badge" id="sessionModeIndicator" style="background: rgba(99, 102, 241, 0.15); color: #818CF8; font-weight: 700; font-size: 0.75rem; text-transform: uppercase;">
+            Practice Mode
+          </span>
+        </div>
+        <button class="icon-btn btn-sm btn-close-modal">✕</button>
+      </div>
+
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- 1. Mode Segmented Switch -->
+        <div>
+          <label class="form-label" style="font-weight: 700; margin-bottom: 0.5rem;">Select Mode</label>
+          <div class="session-mode-toggle" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <button type="button" class="mode-select-card active" id="btnModePractice" data-mode="practice">
+              <div class="mode-icon">🎓</div>
+              <div>
+                <div class="mode-name">Interactive Practice</div>
+                <div class="mode-sub">Instant answers, explanations &amp; self-paced drilling</div>
+              </div>
+            </button>
+            <button type="button" class="mode-select-card" id="btnModeExam" data-mode="exam">
+              <div class="mode-icon">⏱️</div>
+              <div>
+                <div class="mode-name">Timed Examination</div>
+                <div class="mode-sub">Strict timer, review flags, auto-submit &amp; audit score</div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Target Examination Selection -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <label class="form-label">Examination Track</label>
+          <select id="launcherExamSelect" class="form-select">
+            <!-- Dynamic options -->
+          </select>
+        </div>
+
+        <!-- 3. Topic & Difficulty Filters Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Filter by Particular Topic</label>
+            <select id="launcherTopicSelect" class="form-select">
+              <option value="ALL">All Topics</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Difficulty Level</label>
+            <select id="launcherDifficultySelect" class="form-select">
+              <option value="ALL">Any Difficulty</option>
+              <option value="easy">Easy (Level 1-2)</option>
+              <option value="medium">Medium (Level 3-4)</option>
+              <option value="hard">Hard (Level 5)</option>
+            </select>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Question Type</label>
+            <select id="launcherTypeSelect" class="form-select">
+              <option value="ALL">All Question Types</option>
+              <option value="single">Single Choice (MCQ)</option>
+              <option value="multiple">Multiple Choice (Multi-Select)</option>
+              <option value="true_false">True / False</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 4. Starred / Bookmarked Questions Only Toggle -->
+        <div style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-md); padding: 0.75rem 1rem; display: flex; align-items: center; justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 0.6rem;">
+            <span style="font-size: 1.15rem; color: #F59E0B;">⭐</span>
+            <div>
+              <div style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">Practice Bookmarked Questions Only</div>
+              <div style="font-size: 0.78rem; color: var(--text-muted);" id="launcherStarredSub">Filter to questions starred across tests</div>
+            </div>
+          </div>
+          <label class="switch-toggle" style="position: relative; display: inline-block; width: 44px; height: 24px;">
+            <input type="checkbox" id="launcherStarredToggle" style="opacity: 0; width: 0; height: 0;">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
+        <!-- 5. Question Scope & Count -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label class="form-label" style="margin-bottom: 0;">Question Count</label>
+            <span id="launcherCountBadge" style="font-size: 0.78rem; color: var(--text-muted);"></span>
+          </div>
+          <div class="pill-selector-group" id="launcherCountPills" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-secondary count-pill" data-count="10">10 Questions</button>
+            <button type="button" class="btn btn-sm btn-secondary count-pill" data-count="20">20 Questions</button>
+            <button type="button" class="btn btn-sm btn-secondary count-pill" data-count="30">30 Questions</button>
+            <button type="button" class="btn btn-sm btn-primary count-pill active" data-count="all">All Available</button>
+            <button type="button" class="btn btn-sm btn-secondary count-pill" data-count="custom">Custom</button>
+          </div>
+          <div id="launcherCustomCountWrapper" style="display: none; margin-top: 0.65rem;">
+            <input type="number" id="launcherCustomCountInput" class="form-input" min="1" max="500" placeholder="Enter number of questions..." style="max-width: 220px;">
+          </div>
+        </div>
+
+        <!-- 6. Duration / Timer -->
+        <div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <label class="form-label" style="margin-bottom: 0;">Time Limit</label>
+            <span id="launcherDurationLabel" style="font-size: 0.78rem; color: var(--text-muted);"></span>
+          </div>
+          <div class="pill-selector-group" id="launcherDurationPills" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-primary duration-pill active" data-duration="0">Untimed</button>
+            <button type="button" class="btn btn-sm btn-secondary duration-pill" data-duration="15">15 Min</button>
+            <button type="button" class="btn btn-sm btn-secondary duration-pill" data-duration="30">30 Min</button>
+            <button type="button" class="btn btn-sm btn-secondary duration-pill" data-duration="45">45 Min</button>
+            <button type="button" class="btn btn-sm btn-secondary duration-pill" data-duration="60">60 Min</button>
+            <button type="button" class="btn btn-sm btn-secondary duration-pill" data-duration="custom">Custom</button>
+          </div>
+          <div id="launcherCustomDurationWrapper" style="display: none; margin-top: 0.65rem;">
+            <input type="number" id="launcherCustomDurationInput" class="form-input" min="1" max="300" placeholder="Duration in minutes..." style="max-width: 220px;">
+          </div>
+        </div>
+
+        <!-- 7. Shuffling Options -->
+        <div style="display: flex; gap: 1.5rem; flex-wrap: wrap;">
+          <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; color: var(--text-muted);">
+            <input type="checkbox" id="launcherShuffleQuestions" checked style="accent-color: var(--primary);">
+            <span>🔀 Shuffle Question Order</span>
+          </label>
+          <label style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; cursor: pointer; color: var(--text-muted);">
+            <input type="checkbox" id="launcherShuffleOptions" checked style="accent-color: var(--primary);">
+            <span>🔀 Shuffle Option Choices</span>
+          </label>
+        </div>
+
+        <!-- 8. Real-time Availability Feedback Banner -->
+        <div id="launcherAvailabilityBanner" style="padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.84rem; display: flex; align-items: center; gap: 0.5rem;">
+          <!-- Dynamically updated -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-close-modal">Cancel</button>
+        <button class="btn btn-primary" id="btnLaunchConfirmedSession" style="font-weight: 700; padding: 0.65rem 1.4rem;">
+          🚀 Start Session
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====================================================================
+       MODAL: EXAM AUDIT & DETAILED QUESTION BREAKDOWN (REPLICA OF FLUTTER EXAM_AUDIT_SCREEN)
+       ==================================================================== -->
+  <div class="modal-overlay" id="modalExamAudit">
+    <div class="modal-container modal-lg" style="max-height: 92vh;">
+      <div class="modal-header">
+        <div>
+          <h3 class="modal-title" id="auditModalTitle">Performance Audit Breakdown</h3>
+          <p id="auditModalSub" style="margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--text-muted);"></p>
+        </div>
+        <button class="icon-btn btn-sm btn-close-modal">✕</button>
+      </div>
+
+      <div class="modal-body" style="padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem;">
+        <!-- Audit KPI Summary Card -->
+        <div id="auditSummaryCard" style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+          <!-- Dynamically populated -->
+        </div>
+
+        <!-- Filter / Search within Audit -->
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; justify-content: space-between;">
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="btn btn-sm btn-primary audit-filter-pill" data-audit-filter="all">All Questions</button>
+            <button type="button" class="btn btn-sm btn-secondary audit-filter-pill" data-audit-filter="incorrect">Incorrect Only ❌</button>
+            <button type="button" class="btn btn-sm btn-secondary audit-filter-pill" data-audit-filter="correct">Correct Only ✓</button>
+            <button type="button" class="btn btn-sm btn-secondary audit-filter-pill" data-audit-filter="unanswered">Unanswered ⚪</button>
+          </div>
+          <button class="btn btn-warning btn-sm" id="btnAuditPracticeMistakes" style="font-weight: 700; display: none;">
+            🎯 Practice Mistakes Now
+          </button>
+        </div>
+
+        <!-- Detailed Question by Question Audit List -->
+        <div id="auditQuestionsList" style="display: flex; flex-direction: column; gap: 1rem; max-height: 52vh; overflow-y: auto; padding-right: 0.5rem;">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-close-modal">Close Audit</button>
+        <button class="btn btn-primary" id="btnAuditRetakeExam">
+          Retake Examination
         </button>
       </div>
     </div>

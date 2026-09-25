@@ -149,15 +149,29 @@ class StorageRepository {
     return exams.find(e => e.id === id) || null;
   }
 
+  addExam(exam) {
+    return this.saveExam(exam);
+  }
+
   saveExam(exam) {
     const exams = this.getAllExams();
     const now = new Date().toISOString();
-    const idx = exams.findIndex(e => e.id === exam.id);
+    const idx = exam && exam.id ? exams.findIndex(e => e.id === exam.id) : -1;
+
+    const generateUUID = () => {
+      if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    };
 
     const reindex = (qs) => (qs || []).map((q, i) => ({
       ...q,
       displayNumber: i + 1,
-      id: q.id || 'q_' + Date.now() + '_' + i
+      id: q.id || generateUUID()
     }));
 
     if (idx >= 0) {
@@ -169,18 +183,18 @@ class StorageRepository {
       };
     } else {
       const newExam = {
-        id: exam.id || 'exam_' + Date.now(),
-        name: exam.name || 'Untitled Exam',
-        description: exam.description || '',
-        category: exam.category || 'General',
-        provider: exam.provider || 'Self',
-        code: exam.code || '',
-        passingPercentage: Number(exam.passingPercentage) || 75,
-        defaultDuration: exam.defaultDuration !== undefined ? Number(exam.defaultDuration) : 30,
+        id: (exam && exam.id) ? exam.id : generateUUID(),
+        name: (exam && exam.name) || 'Untitled Exam',
+        description: (exam && exam.description) || '',
+        category: (exam && exam.category) || 'General',
+        provider: (exam && exam.provider) || 'Self',
+        code: (exam && exam.code) || '',
+        passingPercentage: (exam && Number(exam.passingPercentage)) || 75,
+        defaultDuration: (exam && exam.defaultDuration !== undefined) ? Number(exam.defaultDuration) : 30,
         createdAt: now,
         updatedAt: now,
         schemaVersion: 1,
-        questions: reindex(exam.questions || [])
+        questions: reindex((exam && exam.questions) || [])
       };
       exams.unshift(newExam);
     }
@@ -365,6 +379,10 @@ class StorageRepository {
   }
 
   // --- Study Streak Calculation ---
+  updateStreak(dateOrStudentId) {
+    return this.updateStudyStreak(typeof dateOrStudentId === 'string' && dateOrStudentId.includes('-') ? dateOrStudentId : undefined);
+  }
+
   updateStudyStreak(attemptDateStr) {
     const student = this.getActiveStudent();
     const streaks = JSON.parse(localStorage.getItem(STORAGE_KEYS.STREAKS) || '{}');
