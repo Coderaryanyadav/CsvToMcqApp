@@ -396,7 +396,7 @@
        MODAL: IMPORT CSV / EXCEL
        ==================================================================== -->
   <div class="modal-overlay" id="modalImport">
-    <div class="modal-container">
+    <div class="modal-container modal-lg">
       <div class="modal-header">
         <h3 class="modal-title">Import Questions</h3>
         <button class="icon-btn btn-sm btn-close-modal">✕</button>
@@ -422,8 +422,8 @@
             <div class="dropzone-icon">
               <svg class="ui-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             </div>
-            <h4>Drag & Drop CSV or Excel (.xlsx) file here</h4>
-            <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">or click to browse from your device</p>
+            <h4 id="importDropzoneTitle">Drag &amp; Drop CSV or Excel (.xlsx) file here</h4>
+            <p id="importDropzoneSubtitle" style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.35rem;">or click to browse from your device</p>
             <input type="file" id="importFileInput" accept=".csv, .xlsx, .xls" style="display: none;">
           </div>
         </div>
@@ -434,32 +434,63 @@
             <label class="form-label">Paste Raw CSV Content</label>
             <textarea id="importPasteTextarea" class="form-textarea" rows="6" placeholder="question,option_a,option_b,option_c,option_d,correct_answer,explanation&#10;What is 2+2?,3,4,5,6,B,2 plus 2 equals 4"></textarea>
           </div>
-          <button class="btn btn-secondary btn-sm" id="btnParsePastedCsv">Parse & Preview Pasted CSV</button>
+          <button class="btn btn-secondary btn-sm" id="btnParsePastedCsv">Parse &amp; Preview Pasted CSV</button>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; flex-wrap: wrap; gap: 0.5rem;">
           <button class="btn btn-secondary btn-sm" id="btnDownloadSampleCsv">
             ⬇️ Download Sample CSV Template
           </button>
           <span style="font-size: 0.75rem; color: var(--text-faint);">Supports aliases: question, option_a..d, correct, explanation</span>
         </div>
 
-        <!-- Preview Table -->
+        <!-- Preview Table Area -->
         <div id="importPreviewArea" style="display: none; margin-top: 1.5rem;">
-          <h4 style="margin-bottom: 0.5rem;">Import Verification Preview</h4>
-          <div id="importPreviewStats"></div>
-          <div style="max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
-            <table class="analytics-table">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+            <h4 style="margin: 0; font-size: 1rem; font-weight: 700;">Import Verification Preview</h4>
+            <span id="importFileBadge" style="font-size: 0.78rem; color: var(--text-muted); font-family: monospace;"></span>
+          </div>
+
+          <div id="importPreviewStats" style="margin-bottom: 0.85rem;"></div>
+
+          <!-- Tabs to switch between Valid Questions and Issues -->
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+            <button type="button" class="btn btn-sm btn-primary" id="btnPreviewTabValid">
+              ✓ Valid Questions (<span id="previewCountValid">0</span>)
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btnPreviewTabIssues">
+              ⚠️ Issues &amp; Warnings (<span id="previewCountIssues">0</span>)
+            </button>
+          </div>
+
+          <!-- Valid Questions Tab Table -->
+          <div id="previewTabValidContent" style="max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+            <table class="analytics-table" style="font-size: 0.82rem;">
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style="width: 45px;">#</th>
                   <th>Question</th>
-                  <th>Options</th>
-                  <th>Answer</th>
-                  <th>Topic</th>
+                  <th style="width: 80px;">Options</th>
+                  <th style="width: 75px;">Answer</th>
+                  <th style="width: 100px;">Topic</th>
                 </tr>
               </thead>
               <tbody id="importPreviewTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Issues & Warnings Tab Table -->
+          <div id="previewTabIssuesContent" style="display: none; max-height: 250px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--radius-md);">
+            <table class="analytics-table" style="font-size: 0.82rem;">
+              <thead>
+                <tr>
+                  <th style="width: 60px;">Row</th>
+                  <th style="width: 170px;">Problem</th>
+                  <th>Recommendation / Fix</th>
+                  <th style="width: 200px;">Raw Row Data</th>
+                </tr>
+              </thead>
+              <tbody id="importIssuesTableBody"></tbody>
             </table>
           </div>
         </div>
@@ -468,7 +499,7 @@
       <div class="modal-footer">
         <button class="btn btn-secondary btn-close-modal">Cancel</button>
         <button class="btn btn-primary" id="btnConfirmImport" style="display: none;">
-          Confirm & Import Questions
+          Import Questions
         </button>
       </div>
     </div>

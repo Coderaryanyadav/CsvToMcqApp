@@ -235,9 +235,10 @@ class QuizProApp {
             <div class="exam-card-header">
               <span class="exam-category-tag">${this.escapeHtml(exam.category || 'General')}</span>
               <div style="display: flex; gap: 0.35rem;">
-                <button class="icon-btn btn-sm btn-card-add-q" title="Add Question to Exam" data-id="${exam.id}">${Icons.plus('', 13)}</button>
-                <button class="icon-btn btn-sm btn-edit-exam" title="Edit Exam Settings" data-id="${exam.id}">${Icons.edit('', 13)}</button>
-                <button class="icon-btn btn-sm btn-delete-exam" title="Delete Exam" data-id="${exam.id}">${Icons.trash('', 13)}</button>
+                <button class="icon-btn btn-sm btn-card-import-icon" title="Import Questions (CSV/Excel)" data-id="${exam.id}">${Icons.upload('', 12)}</button>
+                <button class="icon-btn btn-sm btn-card-add-q" title="Add Question Manually" data-id="${exam.id}">${Icons.plus('', 12)}</button>
+                <button class="icon-btn btn-sm btn-edit-exam" title="Edit Exam Settings" data-id="${exam.id}">${Icons.edit('', 12)}</button>
+                <button class="icon-btn btn-sm btn-delete-exam" title="Delete Exam" data-id="${exam.id}">${Icons.trash('', 12)}</button>
               </div>
             </div>
             <h3 class="exam-card-title">${this.escapeHtml(exam.name)}</h3>
@@ -251,23 +252,47 @@ class QuizProApp {
             </div>
           </div>
 
-          <div class="exam-card-actions">
-            <button class="btn btn-secondary btn-practice-exam" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'title="Add questions to start practice"' : ''}>
-              ${Icons.play('', 12)} Practice
-            </button>
-            <button class="btn btn-primary btn-take-exam" data-id="${exam.id}" style="flex: 1;" ${qCount === 0 ? 'title="Add questions to start timed test"' : ''}>
-              ${Icons.clock('', 12)} Timed Exam
-            </button>
-          </div>
+          ${qCount === 0 ? `
+            <div class="exam-empty-prompt">
+              <div class="exam-empty-banner">
+                ${Icons.info('', 14)}
+                <span>No questions yet. Import questions to begin.</span>
+              </div>
+              <div style="display: flex; gap: 0.5rem; width: 100%;">
+                <button class="btn btn-primary btn-card-import-action" data-id="${exam.id}" style="flex: 1.2; font-size: 0.85rem; padding: 0.55rem 0.75rem;">
+                  ${Icons.upload('', 13)} Import Questions
+                </button>
+                <button class="btn btn-secondary btn-card-add-q-action" data-id="${exam.id}" style="flex: 1; font-size: 0.85rem; padding: 0.55rem 0.75rem;">
+                  ${Icons.plus('', 13)} + Question
+                </button>
+              </div>
+            </div>
+          ` : `
+            <div class="exam-card-actions">
+              <button class="btn btn-secondary btn-practice-exam" data-id="${exam.id}" style="flex: 1;">
+                ${Icons.play('', 12)} Practice (${qCount})
+              </button>
+              <button class="btn btn-primary btn-take-exam" data-id="${exam.id}" style="flex: 1;">
+                ${Icons.clock('', 12)} Timed Exam
+              </button>
+            </div>
+          `}
         </div>
       `;
     }).join('');
 
     // Attach card event listeners
-    container.querySelectorAll('.btn-card-add-q').forEach(btn => {
+    container.querySelectorAll('.btn-card-add-q, .btn-card-add-q-action').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.id;
         this.openAddQuestionModal(id);
+      });
+    });
+
+    container.querySelectorAll('.btn-card-import-icon, .btn-card-import-action').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.id;
+        this.openImportModal(id);
       });
     });
 
@@ -1405,7 +1430,7 @@ class QuizProApp {
   }
 
   // --- Import Modal ---
-  openImportModal() {
+  openImportModal(targetExamId = null) {
     const modal = document.getElementById('modalImport');
     const select = document.getElementById('importTargetExamSelect');
     if (!modal) return;
@@ -1416,9 +1441,21 @@ class QuizProApp {
       ${exams.map(e => `<option value="${e.id}">Append to: ${this.escapeHtml(e.name)}</option>`).join('')}
     `;
 
+    if (targetExamId && exams.some(e => e.id === targetExamId)) {
+      select.value = targetExamId;
+    } else {
+      select.value = 'NEW';
+    }
+
     document.getElementById('importPreviewArea').style.display = 'none';
     document.getElementById('btnConfirmImport').style.display = 'none';
     document.getElementById('importPasteTextarea').value = '';
+    const fileBadge = document.getElementById('importFileBadge');
+    if (fileBadge) fileBadge.textContent = '';
+    const dropzoneTitle = document.getElementById('importDropzoneTitle');
+    if (dropzoneTitle) dropzoneTitle.textContent = 'Drag & Drop CSV or Excel (.xlsx) file here';
+    const dropzoneSub = document.getElementById('importDropzoneSubtitle');
+    if (dropzoneSub) dropzoneSub.textContent = 'or click to browse from your device';
     this.importPreviewData = null;
 
     modal.classList.add('open');
@@ -1697,6 +1734,26 @@ class QuizProApp {
       contentFile.style.display = 'none';
     });
 
+    // Preview Mode Tabs (Valid Questions vs Issues & Warnings)
+    const btnPreviewValid = document.getElementById('btnPreviewTabValid');
+    const btnPreviewIssues = document.getElementById('btnPreviewTabIssues');
+    const contentValid = document.getElementById('previewTabValidContent');
+    const contentIssues = document.getElementById('previewTabIssuesContent');
+
+    btnPreviewValid?.addEventListener('click', () => {
+      btnPreviewValid.className = 'btn btn-sm btn-primary';
+      btnPreviewIssues.className = 'btn btn-sm btn-secondary';
+      if (contentValid) contentValid.style.display = 'block';
+      if (contentIssues) contentIssues.style.display = 'none';
+    });
+
+    btnPreviewIssues?.addEventListener('click', () => {
+      btnPreviewIssues.className = 'btn btn-sm btn-primary';
+      btnPreviewValid.className = 'btn btn-sm btn-secondary';
+      if (contentIssues) contentIssues.style.display = 'block';
+      if (contentValid) contentValid.style.display = 'none';
+    });
+
     // Paste CSV parser button
     document.getElementById('btnParsePastedCsv')?.addEventListener('click', () => {
       const text = document.getElementById('importPasteTextarea').value.trim();
@@ -1925,6 +1982,11 @@ class QuizProApp {
       return;
     }
 
+    const titleEl = document.getElementById('importDropzoneTitle');
+    const subEl = document.getElementById('importDropzoneSubtitle');
+    if (titleEl) titleEl.textContent = `📄 ${filename}`;
+    if (subEl) subEl.textContent = `${(file.size / 1024).toFixed(1)} KB — File processed`;
+
     const reader = new FileReader();
 
     if (isCsv) {
@@ -1953,30 +2015,140 @@ class QuizProApp {
     this.importPreviewData = result;
     const area = document.getElementById('importPreviewArea');
     const statsEl = document.getElementById('importPreviewStats');
-    const tableBody = document.getElementById('importPreviewTableBody');
+    const validTbody = document.getElementById('importPreviewTableBody');
+    const issuesTbody = document.getElementById('importIssuesTableBody');
     const confirmBtn = document.getElementById('btnConfirmImport');
+    const countValidEl = document.getElementById('previewCountValid');
+    const countIssuesEl = document.getElementById('previewCountIssues');
+    const fileBadge = document.getElementById('importFileBadge');
+    const tabValidBtn = document.getElementById('btnPreviewTabValid');
+    const tabIssuesBtn = document.getElementById('btnPreviewTabIssues');
+    const tabValidContent = document.getElementById('previewTabValidContent');
+    const tabIssuesContent = document.getElementById('previewTabIssuesContent');
 
     if (!area || !result) return;
 
     area.style.display = 'block';
-    confirmBtn.style.display = result.validQuestions.length > 0 ? 'inline-flex' : 'none';
 
-    statsEl.innerHTML = `
-      <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
-        <span class="q-badge" style="color: var(--success); font-weight: 700;">✓ ${result.validQuestions.length} Valid Questions</span>
-        <span class="q-badge" style="color: ${result.issues.length > 0 ? 'var(--warning)' : 'var(--text-muted)'}; font-weight: 700;">⚠️ ${result.issues.length} Issues</span>
-      </div>
-    `;
+    const validCount = result.validQuestions ? result.validQuestions.length : 0;
+    const issueCount = result.issues ? result.issues.length : 0;
+    const dupCount = result.duplicateCount || 0;
 
-    tableBody.innerHTML = result.validQuestions.slice(0, 10).map((q, idx) => `
-      <tr>
-        <td><strong>#${idx + 1}</strong></td>
-        <td>${this.escapeHtml(q.question)}</td>
-        <td>${q.options.length} options</td>
-        <td><span style="color: var(--success); font-weight: 700;">${q.correctAnswers.map(a => String.fromCharCode(65 + a)).join(', ')}</span></td>
-        <td>${this.escapeHtml(q.topic || 'General')}</td>
-      </tr>
-    `).join('');
+    if (countValidEl) countValidEl.textContent = validCount;
+    if (countIssuesEl) countIssuesEl.textContent = issueCount;
+    if (fileBadge && result.filename) fileBadge.textContent = `📁 ${result.filename}`;
+
+    // Stats Bar
+    if (statsEl) {
+      statsEl.innerHTML = `
+        <div style="display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap;">
+          <span class="preview-badge ${validCount > 0 ? 'success' : 'secondary'}">
+            ✓ ${validCount} Questions Ready
+          </span>
+          ${issueCount > 0 ? `
+            <span class="preview-badge warning">
+              ⚠️ ${issueCount} Formatting Issues
+            </span>
+          ` : `
+            <span class="preview-badge success">✓ 0 Issues</span>
+          `}
+          ${dupCount > 0 ? `
+            <span class="preview-badge secondary">
+              ℹ️ ${dupCount} Duplicate Questions Skipped
+            </span>
+          ` : ''}
+        </div>
+        ${validCount === 0 ? `
+          <div class="alert alert-danger" style="margin-top: 0.75rem; font-size: 0.82rem; padding: 0.6rem 0.85rem; border-radius: var(--radius-sm); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.25); color: #EF4444;">
+            No questions could be extracted. Please check the "Issues &amp; Warnings" tab below to see specific row errors, or download the sample CSV template.
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // Populate Valid Questions
+    if (validTbody) {
+      if (validCount === 0) {
+        validTbody.innerHTML = `
+          <tr>
+            <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 2rem;">
+              No valid questions detected. Switch to Issues tab to inspect row errors.
+            </td>
+          </tr>
+        `;
+      } else {
+        validTbody.innerHTML = result.validQuestions.slice(0, 50).map((q, idx) => `
+          <tr>
+            <td><strong>#${idx + 1}</strong></td>
+            <td>
+              <div style="max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${this.escapeHtml(q.question)}">
+                ${this.escapeHtml(q.question)}
+              </div>
+            </td>
+            <td><span class="meta-pill" style="font-size: 0.74rem; padding: 0.15rem 0.45rem;">${q.options ? q.options.length : 0} options</span></td>
+            <td>
+              <span class="q-badge" style="background: rgba(16, 185, 129, 0.12); color: #10B981; font-weight: 700; font-size: 0.78rem; padding: 0.2rem 0.5rem; border-radius: var(--radius-sm);">
+                ${q.correctAnswers ? q.correctAnswers.map(a => String.fromCharCode(65 + a)).join(', ') : '-'}
+              </span>
+            </td>
+            <td><span style="color: var(--text-muted); font-size: 0.78rem;">${this.escapeHtml(q.topic || 'General')}</span></td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // Populate Issues Table
+    if (issuesTbody) {
+      if (issueCount === 0) {
+        issuesTbody.innerHTML = `
+          <tr>
+            <td colspan="4" style="text-align: center; color: var(--success); padding: 1.5rem;">
+              🎉 Excellent! No formatting issues found. All rows are valid.
+            </td>
+          </tr>
+        `;
+      } else {
+        issuesTbody.innerHTML = result.issues.slice(0, 50).map(issue => `
+          <tr>
+            <td><strong>Row ${issue.row || '-'}</strong></td>
+            <td><span style="color: #EF4444; font-weight: 600;">${this.escapeHtml(issue.problem || '')}</span></td>
+            <td><span style="color: var(--text-muted); font-size: 0.8rem;">${this.escapeHtml(issue.suggestion || '')}</span></td>
+            <td>
+              <code class="raw-snippet-badge" title="${this.escapeHtml(issue.rawData || '')}">
+                ${this.escapeHtml(issue.rawData || '-')}
+              </code>
+            </td>
+          </tr>
+        `).join('');
+      }
+    }
+
+    // Auto-switch tab if 0 valid questions
+    if (validCount === 0 && issueCount > 0) {
+      if (tabIssuesBtn && tabValidBtn && tabIssuesContent && tabValidContent) {
+        tabIssuesBtn.className = 'btn btn-sm btn-primary';
+        tabValidBtn.className = 'btn btn-sm btn-secondary';
+        tabIssuesContent.style.display = 'block';
+        tabValidContent.style.display = 'none';
+      }
+    } else {
+      if (tabIssuesBtn && tabValidBtn && tabIssuesContent && tabValidContent) {
+        tabValidBtn.className = 'btn btn-sm btn-primary';
+        tabIssuesBtn.className = 'btn btn-sm btn-secondary';
+        tabValidContent.style.display = 'block';
+        tabIssuesContent.style.display = 'none';
+      }
+    }
+
+    // Confirm button state
+    if (confirmBtn) {
+      if (validCount > 0) {
+        confirmBtn.style.display = 'inline-flex';
+        confirmBtn.innerHTML = `${Icons.check('', 14)} Import ${validCount} Question${validCount > 1 ? 's' : ''}`;
+      } else {
+        confirmBtn.style.display = 'none';
+      }
+    }
   }
 
   executeImport() {
