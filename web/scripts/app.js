@@ -13,16 +13,18 @@ class QuizProApp {
     this.currentView = 'exams';
     this.activeEngine = null;
     this.importPreviewData = null;
+    this.selectedLauncherCT = new Map();
+    this.isAllLauncherCTSelected = true;
+    this.launcherCTSearchQuery = '';
     this.init();
   }
 
   init() {
     this.initTheme();
     this.initEventListeners();
-    if (this.checkAuthenticationGate()) {
-      this.renderHeaderInfo();
-      this.switchView('dashboard');
-    }
+    this.checkAuthenticationGate();
+    this.renderHeaderInfo();
+    this.switchView('dashboard');
   }
 
   checkAuthenticationGate() {
@@ -30,20 +32,19 @@ class QuizProApp {
     const modal = document.getElementById('modalAuth');
     const closeBtn = document.getElementById('btnAuthClose');
 
-    if (!isAuth) {
-      if (modal) {
-        modal.classList.add('open', 'modal-locked');
-        if (closeBtn) closeBtn.style.display = 'none';
-        this.switchAuthTab('login');
-      }
-      return false;
-    } else {
-      if (modal) {
-        modal.classList.remove('open', 'modal-locked');
-        if (closeBtn) closeBtn.style.display = 'inline-flex';
-      }
-      return true;
+    // Never lock the screen or block user access on startup
+    if (modal) {
+      modal.classList.remove('modal-locked', 'open');
+      if (closeBtn) closeBtn.style.display = 'inline-flex';
     }
+
+    if (!isAuth) {
+      let active = Storage.getActiveStudent();
+      if (!active) {
+        active = Storage.createStudentProfile('Aryan', '🎓', 'General');
+      }
+    }
+    return true;
   }
 
   onAuthSuccess(message = 'Authenticated successfully') {
@@ -650,7 +651,7 @@ class QuizProApp {
 
           <h3 class="q-title">${this.escapeHtml(q.question)}</h3>
 
-          <div class="options-list">
+          <div class="options-list ${isMulti ? 'is-multi' : 'is-single'}">
             ${q.options.map((optText, optIdx) => {
               const letter = String.fromCharCode(65 + optIdx);
               const isSelected = userAns.has(optIdx);
@@ -668,7 +669,7 @@ class QuizProApp {
 
               return `
                 <div class="option-item ${stateClass}" data-opt-idx="${optIdx}">
-                  <div class="option-letter">${letter}</div>
+                  <div class="option-letter ${isMulti ? 'shape-square' : 'shape-circle'}">${letter}</div>
                   <div style="flex-grow: 1;">
                     <div class="option-text">${this.escapeHtml(optText)}</div>
                     ${isRevealed && explanation ? `<div class="option-explanation-inline">💡 ${this.escapeHtml(explanation)}</div>` : ''}
@@ -865,14 +866,14 @@ class QuizProApp {
 
           <h3 class="q-title">${this.escapeHtml(q.question)}</h3>
 
-          <div class="options-list">
+          <div class="options-list ${isMulti ? 'is-multi' : 'is-single'}">
             ${q.options.map((optText, optIdx) => {
               const letter = String.fromCharCode(65 + optIdx);
               const isSelected = userAns.has(optIdx);
 
               return `
                 <div class="option-item ${isSelected ? 'selected' : ''}" data-opt-idx="${optIdx}">
-                  <div class="option-letter">${letter}</div>
+                  <div class="option-letter ${isMulti ? 'shape-square' : 'shape-circle'}">${letter}</div>
                   <div class="option-text">${this.escapeHtml(optText)}</div>
                 </div>
               `;
@@ -1156,17 +1157,22 @@ class QuizProApp {
     const bookmarks = Storage.getBookmarks(activeStudent.id);
 
     const allQuestions = [];
+    const allChapters = new Set();
     const allTopics = new Set();
 
     exams.forEach(exam => {
       (exam.questions || []).forEach(q => {
         allQuestions.push({ ...q, examId: exam.id, examName: exam.name });
+        if (q.chapter && q.chapter.trim()) allChapters.add(q.chapter.trim());
         if (q.topic && q.topic.trim()) allTopics.add(q.topic.trim());
       });
     });
 
-    // Populate category filter dropdown fresh every render
     const catSelect = document.getElementById('qbCategoryFilter');
+    const chapterSelect = document.getElementById('qbChapterFilter');
+    const topicSelect = document.getElementById('qbTopicFilter');
+
+    // Populate category filter dropdown
     if (catSelect) {
       const currentSelected = catSelect.value;
       catSelect.innerHTML = `<option value="all">All Examinations (${allQuestions.length} questions)</option>`;
@@ -1179,12 +1185,44 @@ class QuizProApp {
       });
     }
 
-    // Populate topic filter dropdown fresh every render
-    const topicSelect = document.getElementById('qbTopicFilter');
+    const currentCat = catSelect?.value || 'all';
+
+    // Populate chapter filter dropdown (filtered by examination if one is selected)
+    const availableChapters = new Set();
+    allQuestions.forEach(q => {
+      if (currentCat === 'all' || q.examId === currentCat) {
+        if (q.chapter && q.chapter.trim()) availableChapters.add(q.chapter.trim());
+      }
+    });
+
+    if (chapterSelect) {
+      const currentChapter = chapterSelect.value;
+      chapterSelect.innerHTML = `<option value="all">All Chapters (${availableChapters.size})</option>`;
+      Array.from(availableChapters).sort().forEach(ch => {
+        const opt = document.createElement('option');
+        opt.value = ch;
+        opt.textContent = ch;
+        if (ch === currentChapter) opt.selected = true;
+        chapterSelect.appendChild(opt);
+      });
+    }
+
+    const currentChap = chapterSelect?.value || 'all';
+
+    // Populate topic filter dropdown (filtered by examination and chapter if selected)
+    const availableTopics = new Set();
+    allQuestions.forEach(q => {
+      const examMatches = currentCat === 'all' || q.examId === currentCat;
+      const chapterMatches = currentChap === 'all' || (q.chapter && q.chapter.trim() === currentChap);
+      if (examMatches && chapterMatches) {
+        if (q.topic && q.topic.trim()) availableTopics.add(q.topic.trim());
+      }
+    });
+
     if (topicSelect) {
       const currentTopic = topicSelect.value;
-      topicSelect.innerHTML = `<option value="all">All Topics (${allTopics.size})</option>`;
-      Array.from(allTopics).sort().forEach(top => {
+      topicSelect.innerHTML = `<option value="all">All Topics (${availableTopics.size})</option>`;
+      Array.from(availableTopics).sort().forEach(top => {
         const opt = document.createElement('option');
         opt.value = top;
         opt.textContent = top;
@@ -1195,6 +1233,7 @@ class QuizProApp {
 
     const searchInput = document.getElementById('qbSearchInput')?.value.toLowerCase().trim() || '';
     const categoryFilter = catSelect?.value || 'all';
+    const chapterFilter = chapterSelect?.value || 'all';
     const topicFilter = topicSelect?.value || 'all';
     const typeFilter = document.getElementById('qbTypeFilter')?.value || 'all';
     const starredOnly = document.getElementById('btnQbToggleStarred')?.classList.contains('active');
@@ -1202,9 +1241,11 @@ class QuizProApp {
     let filtered = allQuestions.filter(q => {
       const matchSearch = !searchInput || 
                           q.question.toLowerCase().includes(searchInput) ||
+                          (q.chapter && q.chapter.toLowerCase().includes(searchInput)) ||
                           (q.topic && q.topic.toLowerCase().includes(searchInput)) ||
                           (q.tags && q.tags.some(t => t.toLowerCase().includes(searchInput)));
       const matchExam = categoryFilter === 'all' || q.examId === categoryFilter;
+      const matchChapter = chapterFilter === 'all' || (q.chapter && q.chapter.trim() === chapterFilter);
       const matchTopic = topicFilter === 'all' || (q.topic && q.topic.trim() === topicFilter);
 
       let matchType = true;
@@ -1218,7 +1259,7 @@ class QuizProApp {
 
       const matchStarred = !starredOnly || bookmarks.has(q.id);
 
-      return matchSearch && matchExam && matchTopic && matchType && matchStarred;
+      return matchSearch && matchExam && matchChapter && matchTopic && matchType && matchStarred;
     });
 
     if (allQuestions.length === 0) {
@@ -1251,8 +1292,9 @@ class QuizProApp {
           <div class="question-card-header">
             <div class="q-meta-group">
               <span class="q-badge" style="color: var(--primary);">📚 ${this.escapeHtml(q.examName)}</span>
+              ${q.chapter ? `<span class="q-badge" style="color: #8B5CF6;">📖 ${this.escapeHtml(q.chapter)}</span>` : ''}
               ${q.topic ? `<span class="q-badge">🏷️ ${this.escapeHtml(q.topic)}</span>` : ''}
-              <span class="q-badge">${q.questionType === 'multiple' ? '☑️ Multi' : '🔘 Single'}</span>
+              <span class="q-badge">${q.questionType === 'multiple' ? '☑️ Multi' : q.questionType === 'true_false' ? '⚖️ T/F' : '🔘 Single'}</span>
               <span style="font-size: 0.8rem; color: var(--text-faint);">Diff: ${'★'.repeat(q.difficulty || 3)}</span>
             </div>
             <div style="display: flex; gap: 0.35rem; align-items: center;">
@@ -1577,11 +1619,12 @@ class QuizProApp {
             ${this.escapeHtml(snap.question)}
           </div>
 
-          <div class="options-list" style="gap: 0.45rem;">
+          <div class="options-list ${snap.questionType === 'multiple' || (correctAnswers && correctAnswers.size > 1) ? 'is-multi' : 'is-single'}" style="gap: 0.45rem;">
             ${(snap.options || []).map((optText, optIdx) => {
               const letter = String.fromCharCode(65 + optIdx);
               const isUserChoice = userAnswers.has(optIdx);
               const isKey = correctAnswers.has(optIdx);
+              const isMultiOpt = snap.questionType === 'multiple' || (correctAnswers && correctAnswers.size > 1);
 
               let itemClass = '';
               if (isKey) itemClass = 'is-correct';
@@ -1591,7 +1634,7 @@ class QuizProApp {
 
               return `
                 <div class="option-item ${itemClass}" style="padding: 0.55rem 0.85rem; font-size: 0.86rem;">
-                  <div class="option-letter" style="width: 24px; height: 24px; font-size: 0.78rem;">${letter}</div>
+                  <div class="option-letter ${isMultiOpt ? 'shape-square' : 'shape-circle'}" style="width: 24px; height: 24px; font-size: 0.78rem;">${letter}</div>
                   <div style="flex-grow: 1;">
                     <div class="option-text">${this.escapeHtml(optText)}</div>
                     ${exp ? `<div class="option-explanation-inline" style="font-size: 0.78rem; margin-top: 0.3rem;">💡 ${this.escapeHtml(exp)}</div>` : ''}
@@ -1650,9 +1693,9 @@ class QuizProApp {
     this.launcherMode = defaultMode;
     this.updateLauncherModeUI(defaultMode);
 
-    // Refresh Topics
+    // Refresh Chapters & Topics for selected examination
     const activeExamId = examSelect ? examSelect.value : examId;
-    this.refreshLauncherTopics(activeExamId);
+    this.refreshLauncherChaptersAndTopics(activeExamId);
 
     // Reset filters
     const diffSelect = document.getElementById('launcherDifficultySelect');
@@ -1733,25 +1776,288 @@ class QuizProApp {
     }
   }
 
-  refreshLauncherTopics(examId) {
-    const topicSelect = document.getElementById('launcherTopicSelect');
-    if (!topicSelect) return;
+  isQuestionCTMatched(q) {
+    if (this.isAllLauncherCTSelected) return true;
+    if (!this.selectedLauncherCT || this.selectedLauncherCT.size === 0) return false;
+
+    const chap = (q.chapter && q.chapter.trim()) ? q.chapter.trim() : 'General / Other';
+    const top = (q.topic && q.topic.trim()) ? q.topic.trim() : 'General / Other';
+
+    const selectedTopics = this.selectedLauncherCT.get(chap);
+    if (!selectedTopics) return false;
+
+    return selectedTopics.has(top);
+  }
+
+  renderLauncherChapterTopicMatrix(examId, preserveSelection = false) {
+    const matrixBody = document.getElementById('launcherCTMatrixBody');
+    const countPill = document.getElementById('launcherCTCountPill');
+    if (!matrixBody || !examId) return;
 
     const exam = Storage.getExamById(examId);
     const questions = exam ? (exam.questions || []) : [];
-    const topics = new Set();
+
+    // Group questions by Chapter and Topic
+    const chapterMap = new Map();
     questions.forEach(q => {
-      if (q.topic && q.topic.trim()) topics.add(q.topic.trim());
+      const ch = (q.chapter && q.chapter.trim()) ? q.chapter.trim() : 'General / Other';
+      const tp = (q.topic && q.topic.trim()) ? q.topic.trim() : 'General / Other';
+
+      if (!chapterMap.has(ch)) {
+        chapterMap.set(ch, { total: 0, topics: new Map() });
+      }
+      const chData = chapterMap.get(ch);
+      chData.total++;
+      chData.topics.set(tp, (chData.topics.get(tp) || 0) + 1);
     });
 
-    topicSelect.innerHTML = `<option value="ALL">All Topics (${topics.size} discovered)</option>` +
-      Array.from(topics).sort().map(t => `<option value="${this.escapeHtml(t)}">${this.escapeHtml(t)}</option>`).join('');
+    // If not preserving selection or empty, default to all selected
+    if (!preserveSelection || !this.selectedLauncherCT || this.selectedLauncherCT.size === 0) {
+      this.selectedLauncherCT = new Map();
+      chapterMap.forEach((chData, chName) => {
+        this.selectedLauncherCT.set(chName, new Set(chData.topics.keys()));
+      });
+      this.isAllLauncherCTSelected = true;
+    }
+
+    const searchQuery = (this.launcherCTSearchQuery || '').trim().toLowerCase();
+
+    // Render matrix rows matching user specification (2 columns: CHAPTER | TOPICS)
+    let renderedRowsHtml = '';
+    let totalTopicsCount = 0;
+
+    chapterMap.forEach((chData, chName) => {
+      totalTopicsCount += chData.topics.size;
+
+      const chapMatchesQuery = !searchQuery || chName.toLowerCase().includes(searchQuery);
+      const matchingTopics = [];
+      chData.topics.forEach((cnt, tpName) => {
+        if (!searchQuery || chapMatchesQuery || tpName.toLowerCase().includes(searchQuery)) {
+          matchingTopics.push({ name: tpName, count: cnt });
+        }
+      });
+
+      if (searchQuery && !chapMatchesQuery && matchingTopics.length === 0) {
+        return; // filtered out by search
+      }
+
+      const selectedInThisChap = this.selectedLauncherCT.get(chName) || new Set();
+      const allSelectedInChap = chData.topics.size > 0 && selectedInThisChap.size === chData.topics.size;
+      const someSelectedInChap = selectedInThisChap.size > 0;
+
+      let chapStateClass = '';
+      if (allSelectedInChap) {
+        chapStateClass = 'all-selected';
+      } else if (someSelectedInChap) {
+        chapStateClass = 'has-selected';
+      }
+
+      const chapSelectedBadge = someSelectedInChap 
+        ? `${selectedInThisChap.size}/${chData.topics.size} Topics (${chData.total} Qs)` 
+        : `0/${chData.topics.size} Topics (${chData.total} Qs)`;
+
+      renderedRowsHtml += `
+        <div class="ct-chapter-row" data-chapter="${this.escapeHtml(chName)}">
+          <div class="ct-chapter-cell ${chapStateClass}" data-action="toggle-chapter" data-chapter="${this.escapeHtml(chName)}" title="Click to select/deselect all topics in ${this.escapeHtml(chName)}">
+            <div class="ct-chap-title">
+              <span>${allSelectedInChap ? '☑️' : (someSelectedInChap ? '🔲' : '⬜')}</span>
+              <span>${this.escapeHtml(chName)}</span>
+            </div>
+            <span class="ct-chap-badge">${chapSelectedBadge}</span>
+          </div>
+
+          <div class="ct-topics-list">
+            ${(searchQuery ? matchingTopics : Array.from(chData.topics.entries()).map(([t, c]) => ({ name: t, count: c }))).map(topic => {
+              const isSelected = selectedInThisChap.has(topic.name);
+              return `
+                <div class="ct-topic-item ${isSelected ? 'selected' : ''}" 
+                     data-action="toggle-topic" 
+                     data-chapter="${this.escapeHtml(chName)}" 
+                     data-topic="${this.escapeHtml(topic.name)}"
+                     title="Click to toggle: ${this.escapeHtml(chName)} ➔ ${this.escapeHtml(topic.name)}">
+                  <div class="ct-topic-left">
+                    <span style="font-size: 0.9rem; font-weight: 700;">${isSelected ? '✓' : '○'}</span>
+                    <span class="ct-topic-title">${this.escapeHtml(topic.name)}</span>
+                  </div>
+                  <span class="ct-topic-count">${topic.count} Qs</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    });
+
+    if (renderedRowsHtml === '') {
+      renderedRowsHtml = `
+        <div style="padding: 2rem; text-align: center; color: var(--text-muted); font-size: 0.88rem;">
+          🔍 No chapters or topics matched your search "${this.escapeHtml(searchQuery)}".
+        </div>
+      `;
+    }
+
+    matrixBody.innerHTML = renderedRowsHtml;
+
+    if (countPill) {
+      countPill.textContent = `${chapterMap.size} Chapters • ${totalTopicsCount} Topics`;
+    }
+
+    this.updateLauncherCTSummary(chapterMap);
+  }
+
+  updateLauncherCTSummary(chapterMapOpt) {
+    const titleEl = document.getElementById('launcherCTSummaryTitle');
+    const subEl = document.getElementById('launcherCTSummarySubtitle');
+    const examSelect = document.getElementById('launcherExamSelect');
+    if (!titleEl || !examSelect) return;
+
+    const exam = Storage.getExamById(examSelect.value);
+    const questions = exam ? (exam.questions || []) : [];
+
+    let selectedTopicsCount = 0;
+    let totalTopicsCount = 0;
+    let totalChaptersCount = 0;
+    const selectedChapsList = [];
+
+    const chapterMap = chapterMapOpt || new Map();
+    if (!chapterMapOpt && exam) {
+      questions.forEach(q => {
+        const ch = (q.chapter && q.chapter.trim()) ? q.chapter.trim() : 'General / Other';
+        const tp = (q.topic && q.topic.trim()) ? q.topic.trim() : 'General / Other';
+        if (!chapterMap.has(ch)) chapterMap.set(ch, { topics: new Set() });
+        chapterMap.get(ch).topics.add(tp);
+      });
+    }
+
+    chapterMap.forEach((chData, chName) => {
+      totalChaptersCount++;
+      const numTopicsInChap = chData.topics ? chData.topics.size : 0;
+      totalTopicsCount += numTopicsInChap;
+
+      const selTopics = this.selectedLauncherCT.get(chName);
+      if (selTopics && selTopics.size > 0) {
+        selectedTopicsCount += selTopics.size;
+        selectedChapsList.push({
+          chapter: chName,
+          topics: Array.from(selTopics)
+        });
+      }
+    });
+
+    const isAll = (selectedTopicsCount === totalTopicsCount) && totalTopicsCount > 0;
+    this.isAllLauncherCTSelected = isAll;
+
+    if (isAll) {
+      titleEl.innerHTML = `All Chapters & Topics Selected <span style="color: #10B981; font-weight: 700;">(${totalChaptersCount} Chapters, ${totalTopicsCount} Topics)</span>`;
+      if (subEl) subEl.textContent = 'All syllabus sections included. Click to pick specific chapters & topics.';
+    } else if (selectedTopicsCount === 0) {
+      titleEl.innerHTML = `⚠️ <span style="color: #EF4444; font-weight: 700;">No Topics Selected (0 Questions)</span>`;
+      if (subEl) subEl.textContent = 'Select topics from the table below or click "Select All" to proceed.';
+    } else {
+      titleEl.innerHTML = `🎯 <strong>${selectedTopicsCount} Topics Selected</strong> across ${selectedChapsList.length} Chapters`;
+      if (subEl) {
+        const detailSnippet = selectedChapsList.map(item => {
+          const shortChap = item.chapter.length > 18 ? item.chapter.substring(0, 16) + '...' : item.chapter;
+          return `${shortChap} (${item.topics.length} topic${item.topics.length > 1 ? 's' : ''})`;
+        }).join(' • ');
+        subEl.textContent = detailSnippet;
+      }
+    }
+  }
+
+  toggleLauncherChapter(chapterName) {
+    const examSelect = document.getElementById('launcherExamSelect');
+    if (!examSelect) return;
+    const exam = Storage.getExamById(examSelect.value);
+    const questions = exam ? (exam.questions || []) : [];
+
+    const allTopicsInChap = new Set();
+    questions.forEach(q => {
+      const ch = (q.chapter && q.chapter.trim()) ? q.chapter.trim() : 'General / Other';
+      if (ch === chapterName) {
+        const tp = (q.topic && q.topic.trim()) ? q.topic.trim() : 'General / Other';
+        allTopicsInChap.add(tp);
+      }
+    });
+
+    const currentSelected = this.selectedLauncherCT.get(chapterName) || new Set();
+    const isFullySelected = currentSelected.size === allTopicsInChap.size;
+
+    if (isFullySelected) {
+      this.selectedLauncherCT.delete(chapterName);
+    } else {
+      this.selectedLauncherCT.set(chapterName, new Set(allTopicsInChap));
+    }
+
+    this.renderLauncherChapterTopicMatrix(examSelect.value, true);
+    this.updateLauncherAvailability();
+  }
+
+  toggleLauncherTopic(chapterName, topicName) {
+    const examSelect = document.getElementById('launcherExamSelect');
+    if (!examSelect) return;
+
+    if (!this.selectedLauncherCT.has(chapterName)) {
+      this.selectedLauncherCT.set(chapterName, new Set());
+    }
+
+    const topicSet = this.selectedLauncherCT.get(chapterName);
+    if (topicSet.has(topicName)) {
+      topicSet.delete(topicName);
+      if (topicSet.size === 0) {
+        this.selectedLauncherCT.delete(chapterName);
+      }
+    } else {
+      topicSet.add(topicName);
+    }
+
+    this.renderLauncherChapterTopicMatrix(examSelect.value, true);
+    this.updateLauncherAvailability();
+  }
+
+  selectAllLauncherCT() {
+    const examSelect = document.getElementById('launcherExamSelect');
+    if (!examSelect) return;
+    const exam = Storage.getExamById(examSelect.value);
+    const questions = exam ? (exam.questions || []) : [];
+
+    this.selectedLauncherCT = new Map();
+    questions.forEach(q => {
+      const ch = (q.chapter && q.chapter.trim()) ? q.chapter.trim() : 'General / Other';
+      const tp = (q.topic && q.topic.trim()) ? q.topic.trim() : 'General / Other';
+      if (!this.selectedLauncherCT.has(ch)) {
+        this.selectedLauncherCT.set(ch, new Set());
+      }
+      this.selectedLauncherCT.get(ch).add(tp);
+    });
+    this.isAllLauncherCTSelected = true;
+
+    this.renderLauncherChapterTopicMatrix(examSelect.value, true);
+    this.updateLauncherAvailability();
+  }
+
+  clearAllLauncherCT() {
+    const examSelect = document.getElementById('launcherExamSelect');
+    if (!examSelect) return;
+
+    this.selectedLauncherCT = new Map();
+    this.isAllLauncherCTSelected = false;
+
+    this.renderLauncherChapterTopicMatrix(examSelect.value, true);
+    this.updateLauncherAvailability();
+  }
+
+  refreshLauncherChaptersAndTopics(examId) {
+    this.renderLauncherChapterTopicMatrix(examId, false);
+  }
+
+  refreshLauncherTopics(examId) {
+    // Kept as alias for compatibility
   }
 
   updateLauncherAvailability() {
     const banner = document.getElementById('launcherAvailabilityBanner');
     const examSelect = document.getElementById('launcherExamSelect');
-    const topicSelect = document.getElementById('launcherTopicSelect');
     const diffSelect = document.getElementById('launcherDifficultySelect');
     const typeSelect = document.getElementById('launcherTypeSelect');
     const starredToggle = document.getElementById('launcherStarredToggle');
@@ -1769,14 +2075,13 @@ class QuizProApp {
     const student = Storage.getActiveStudent();
     const bookmarks = Storage.getBookmarks(student.id);
 
-    const chosenTopic = topicSelect ? topicSelect.value : 'ALL';
     const chosenDiff = diffSelect ? diffSelect.value : 'ALL';
     const chosenType = typeSelect ? typeSelect.value : 'ALL';
     const isStarred = starredToggle ? starredToggle.checked : false;
 
     const matched = exam.questions.filter(q => {
       if (isStarred && !bookmarks.has(q.id)) return false;
-      if (chosenTopic !== 'ALL' && (!q.topic || q.topic.trim() !== chosenTopic)) return false;
+      if (!this.isQuestionCTMatched(q)) return false;
       
       if (chosenDiff !== 'ALL') {
         const d = q.difficulty || 3;
@@ -1807,7 +2112,7 @@ class QuizProApp {
     if (count === 0) {
       banner.style.background = 'rgba(239, 68, 68, 0.1)';
       banner.style.color = '#EF4444';
-      banner.innerHTML = `⚠️ <strong>0 Questions Available:</strong> Try broadening your filters or turning off "Bookmarked Questions Only".`;
+      banner.innerHTML = `⚠️ <strong>0 Questions Available:</strong> Broaden your Chapter/Topic selections or disable "Bookmarked Only".`;
     } else {
       banner.style.background = 'rgba(16, 185, 129, 0.12)';
       banner.style.color = '#10B981';
@@ -1817,7 +2122,6 @@ class QuizProApp {
 
   executeLaunchSession() {
     const examSelect = document.getElementById('launcherExamSelect');
-    const topicSelect = document.getElementById('launcherTopicSelect');
     const diffSelect = document.getElementById('launcherDifficultySelect');
     const typeSelect = document.getElementById('launcherTypeSelect');
     const starredToggle = document.getElementById('launcherStarredToggle');
@@ -1836,14 +2140,35 @@ class QuizProApp {
     const student = Storage.getActiveStudent();
     const bookmarks = Storage.getBookmarks(student.id);
 
-    const chosenTopic = topicSelect ? topicSelect.value : 'ALL';
     const chosenDiff = diffSelect ? diffSelect.value : 'ALL';
     const chosenType = typeSelect ? typeSelect.value : 'ALL';
     const isStarred = starredToggle ? starredToggle.checked : false;
 
     let matched = exam.questions.filter(q => {
       if (isStarred && !bookmarks.has(q.id)) return false;
-      if (chosenTopic !== 'ALL' && (!q.topic || q.topic.trim() !== chosenTopic)) return false;
+      if (!this.isQuestionCTMatched(q)) return false;
+      
+      if (chosenDiff !== 'ALL') {
+        const d = q.difficulty || 3;
+        if (chosenDiff === 'easy' && d > 2) return false;
+        if (chosenDiff === 'medium' && (d < 3 || d > 4)) return false;
+        if (chosenDiff === 'hard' && d < 5) return false;
+      }
+
+      if (chosenType !== 'ALL') {
+        if (chosenType === 'single') {
+          const isSingle = q.questionType === 'single' || (!q.questionType && (!q.correctAnswers || q.correctAnswers.length <= 1));
+          if (!isSingle) return false;
+        } else if (chosenType === 'multiple') {
+          const isMulti = q.questionType === 'multiple' || (q.correctAnswers && q.correctAnswers.length > 1);
+          if (!isMulti) return false;
+        } else if (chosenType === 'true_false') {
+          if (q.questionType !== 'true_false') return false;
+        }
+      }
+
+      return true;
+    });
       
       if (chosenDiff !== 'ALL') {
         const d = q.difficulty || 3;
@@ -2820,13 +3145,55 @@ class QuizProApp {
     });
 
     document.getElementById('launcherExamSelect')?.addEventListener('change', (e) => {
-      this.refreshLauncherTopics(e.target.value);
+      this.renderLauncherChapterTopicMatrix(e.target.value, false);
       this.updateLauncherDurationPillsUI();
       this.updateLauncherAvailability();
     });
 
-    document.getElementById('launcherTopicSelect')?.addEventListener('change', () => {
-      this.updateLauncherAvailability();
+    document.getElementById('btnLauncherSelectAllCT')?.addEventListener('click', () => {
+      this.selectAllLauncherCT();
+    });
+
+    document.getElementById('btnLauncherClearAllCT')?.addEventListener('click', () => {
+      this.clearAllLauncherCT();
+    });
+
+    const toggleCTMatrix = () => {
+      const container = document.getElementById('launcherCTMatrixContainer');
+      const summaryBar = document.getElementById('launcherCTSummaryBar');
+      if (container) {
+        const isHidden = container.style.display === 'none';
+        container.style.display = isHidden ? 'flex' : 'none';
+        if (summaryBar) summaryBar.classList.toggle('open', isHidden);
+      }
+    };
+
+    document.getElementById('btnLauncherToggleCT')?.addEventListener('click', toggleCTMatrix);
+    document.getElementById('launcherCTSummaryBar')?.addEventListener('click', toggleCTMatrix);
+
+    document.getElementById('launcherCTSearch')?.addEventListener('input', (e) => {
+      this.launcherCTSearchQuery = e.target.value;
+      const examSelect = document.getElementById('launcherExamSelect');
+      if (examSelect) {
+        this.renderLauncherChapterTopicMatrix(examSelect.value, true);
+      }
+    });
+
+    document.getElementById('launcherCTMatrixBody')?.addEventListener('click', (e) => {
+      const topicEl = e.target.closest('[data-action="toggle-topic"]');
+      if (topicEl) {
+        const ch = topicEl.dataset.chapter;
+        const tp = topicEl.dataset.topic;
+        if (ch && tp) this.toggleLauncherTopic(ch, tp);
+        return;
+      }
+
+      const chapEl = e.target.closest('[data-action="toggle-chapter"]');
+      if (chapEl) {
+        const ch = chapEl.dataset.chapter;
+        if (ch) this.toggleLauncherChapter(ch);
+        return;
+      }
     });
 
     document.getElementById('launcherDifficultySelect')?.addEventListener('change', () => {

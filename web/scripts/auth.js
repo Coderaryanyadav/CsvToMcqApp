@@ -83,7 +83,16 @@ class AuthService {
     const user = users.find(u => u.email === cleanEmail);
 
     if (!user) {
-      throw new Error('No account found with this email. Please check your spelling or sign up.');
+      // Auto-create account on first login for seamless access
+      const localPart = cleanEmail.split('@')[0];
+      const displayName = localPart.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      return await this.register({
+        name: displayName || 'Scholar Aryan',
+        email: cleanEmail,
+        password: password,
+        avatarEmoji: '🎓',
+        targetExam: 'General'
+      });
     }
 
     const inputHash = await hashPassword(password);

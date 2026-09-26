@@ -37,7 +37,7 @@
     <div class="header-inner">
       <div class="brand-wrapper" id="brandHomeLink">
         <img src="assets/icon.jpg" alt="QuizPro" class="brand-logo-img">
-        <div>
+        <div class="brand-text-group">
           <span class="brand-title">QuizPro</span>
           <span class="brand-badge">Web v2.0</span>
         </div>
@@ -322,6 +322,9 @@
         <input type="text" id="qbSearchInput" class="form-input" placeholder="Search by keyword, question, or topic..." style="flex: 2; min-width: 220px;">
         <select id="qbCategoryFilter" class="form-select" style="flex: 1; min-width: 160px;">
           <option value="all">All Examinations</option>
+        </select>
+        <select id="qbChapterFilter" class="form-select" style="flex: 1; min-width: 150px;">
+          <option value="all">All Chapters</option>
         </select>
         <select id="qbTopicFilter" class="form-select" style="flex: 1; min-width: 150px;">
           <option value="all">All Topics</option>
@@ -702,15 +705,57 @@
           </select>
         </div>
 
-        <!-- 3. Topic & Difficulty Filters Grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-          <div class="form-group" style="margin-bottom: 0;">
-            <label class="form-label">Filter by Particular Topic</label>
-            <select id="launcherTopicSelect" class="form-select">
-              <option value="ALL">All Topics</option>
-            </select>
+        <!-- 3. Chapter & Topic Hierarchical Matrix Selector -->
+        <div class="form-group" style="margin-bottom: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; flex-wrap: wrap; gap: 0.5rem;">
+            <label class="form-label" style="margin-bottom: 0; font-weight: 700; display: flex; align-items: center; gap: 0.4rem;">
+              <span>📚</span> Chapter & Topic Selection
+            </label>
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              <button type="button" class="btn btn-secondary btn-xs" id="btnLauncherSelectAllCT" style="padding: 3px 9px; font-size: 0.76rem;">Select All</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btnLauncherClearAllCT" style="padding: 3px 9px; font-size: 0.76rem;">Clear All</button>
+              <button type="button" class="btn btn-secondary btn-xs" id="btnLauncherToggleCT" style="padding: 3px 9px; font-size: 0.76rem;">Toggle Table</button>
+            </div>
           </div>
 
+          <!-- Dropdown Trigger / Summary Bar -->
+          <div id="launcherCTSummaryBar" class="ct-summary-bar open">
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex: 1; min-width: 0;">
+              <span style="font-size: 1.1rem;">📑</span>
+              <div style="min-width: 0; flex: 1;">
+                <div id="launcherCTSummaryTitle" style="font-size: 0.88rem; font-weight: 600; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">All Chapters & Topics Selected</div>
+                <div id="launcherCTSummarySubtitle" style="font-size: 0.76rem; color: var(--text-muted);">Click to toggle table or select specific chapters and topics</div>
+              </div>
+            </div>
+            <span id="launcherCTCaret" class="ct-caret">▼</span>
+          </div>
+
+          <!-- Hierarchical 2-Column Matrix matching User Specification -->
+          <div id="launcherCTMatrixContainer" class="ct-matrix-container">
+            <div class="ct-matrix-toolbar">
+              <input type="text" id="launcherCTSearch" placeholder="🔍 Search chapters or topics..." class="form-input" style="font-size: 0.8rem; padding: 0.35rem 0.65rem; max-width: 260px; height: 32px;">
+              <span id="launcherCTCountPill" class="ct-chap-badge" style="font-weight: 600;">Loading chapters...</span>
+            </div>
+            <div class="ct-matrix-header">
+              <div class="ct-matrix-col-chap">CHAPTER (Select All/None)</div>
+              <div class="ct-matrix-col-topic">TOPICS (Click to Toggle Individual Topics)</div>
+            </div>
+            <div id="launcherCTMatrixBody" class="ct-matrix-body">
+              <!-- Dynamically populated rows -->
+            </div>
+          </div>
+
+          <!-- Hidden selects for backward compatibility -->
+          <select id="launcherChapterSelect" class="form-select" style="display: none;">
+            <option value="ALL">All Chapters</option>
+          </select>
+          <select id="launcherTopicSelect" class="form-select" style="display: none;">
+            <option value="ALL">All Topics</option>
+          </select>
+        </div>
+
+        <!-- Difficulty & Question Type Filters Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Difficulty Level</label>
             <select id="launcherDifficultySelect" class="form-select">
@@ -959,7 +1004,11 @@
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label">Chapter</label>
+            <input type="text" id="qInputChapter" class="form-input" placeholder="e.g. Chapter 1">
+          </div>
           <div class="form-group">
             <label class="form-label">Topic / Category</label>
             <input type="text" id="qInputTopic" class="form-input" placeholder="e.g. Storage, Networking">
@@ -1080,22 +1129,22 @@
   </div>
 
   <!-- ====================================================================
-       MODAL: USER AUTHENTICATION GATE (COMPULSORY ACCESS)
+       MODAL: USER AUTHENTICATION & CLOUD SYNC
        ==================================================================== -->
-  <div class="modal-overlay modal-locked" id="modalAuth">
+  <div class="modal-overlay" id="modalAuth">
     <div class="modal-container" style="max-width: 440px;">
       <div class="modal-header" style="border-bottom: none; padding-bottom: 0.5rem;">
         <div style="display: flex; align-items: center; gap: 0.65rem;">
           <img src="assets/icon.jpg" alt="QuizPro" style="width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
           <span style="font-weight: 700; font-size: 1rem; letter-spacing: -0.02em;">QuizPro Account</span>
         </div>
-        <button class="icon-btn btn-sm btn-close-modal" id="btnAuthClose" style="display: none;" title="Close">✕</button>
+        <button class="icon-btn btn-sm btn-close-modal" id="btnAuthClose" style="display: inline-flex;" title="Close">✕</button>
       </div>
 
       <div class="modal-body" style="padding-top: 0.5rem;">
         <div style="margin-bottom: 1.25rem;">
-          <h2 style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.25rem;" id="authModalTitle">Sign In to Continue</h2>
-          <p style="color: var(--text-muted); font-size: 0.85rem;">Login is required to practice, track attempts, and sync with your cloud database.</p>
+          <h2 style="font-size: 1.35rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 0.25rem;" id="authModalTitle">Sign In to QuizPro</h2>
+          <p style="color: var(--text-muted); font-size: 0.85rem;">Sign in or create an account to sync progress across devices, or use offline local mode.</p>
         </div>
 
         <div id="authAlertBox" class="auth-alert" style="display: none;"></div>

@@ -538,6 +538,13 @@ class ImportService {
       String questionType = 'single';
       if (qTypeRaw.contains('multi') || parsedAnswers.length > 1) {
         questionType = 'multiple';
+      } else if (qTypeRaw.contains('true') ||
+          qTypeRaw == 'tf' ||
+          qTypeRaw == 'boolean' ||
+          (options.length == 2 &&
+              options[0].toLowerCase() == 'true' &&
+              options[1].toLowerCase() == 'false')) {
+        questionType = 'true_false';
       }
 
       int diff = 3;

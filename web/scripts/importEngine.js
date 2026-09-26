@@ -486,7 +486,12 @@ export function processRows(rows, filename = 'import.csv', existingQuestions = n
     }
 
     const tags = tagsRaw ? tagsRaw.split(/[,;|]/).map(t => t.trim()).filter(Boolean) : [];
-    const questionType = qTypeRaw === 'multiple' || correctAnswers.size > 1 ? 'multiple' : 'single';
+    let questionType = 'single';
+    if (qTypeRaw.includes('multi') || correctAnswers.size > 1) {
+      questionType = 'multiple';
+    } else if (qTypeRaw.includes('true') || qTypeRaw === 'tf' || qTypeRaw === 'boolean' || (cleanedOptions.length === 2 && cleanedOptions[0].toLowerCase() === 'true' && cleanedOptions[1].toLowerCase() === 'false')) {
+      questionType = 'true_false';
+    }
     const difficulty = isNaN(diffRaw) || diffRaw < 1 || diffRaw > 5 ? 3 : diffRaw;
 
     validQuestions.push({
