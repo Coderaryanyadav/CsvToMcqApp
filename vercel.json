@@ -1,5 +1,12 @@
 {
   "cleanUrls": true,
+  "rewrites": [
+    { "source": "/", "destination": "/web/index.html" },
+    { "source": "/styles/(.*)", "destination": "/web/styles/$1" },
+    { "source": "/scripts/(.*)", "destination": "/web/scripts/$1" },
+    { "source": "/assets/(.*)", "destination": "/web/assets/$1" },
+    { "source": "/supabase/(.*)", "destination": "/web/supabase/$1" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
