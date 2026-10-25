@@ -2169,28 +2169,6 @@ class QuizProApp {
 
       return true;
     });
-      
-      if (chosenDiff !== 'ALL') {
-        const d = q.difficulty || 3;
-        if (chosenDiff === 'easy' && d > 2) return false;
-        if (chosenDiff === 'medium' && (d < 3 || d > 4)) return false;
-        if (chosenDiff === 'hard' && d < 5) return false;
-      }
-
-      if (chosenType !== 'ALL') {
-        if (chosenType === 'single') {
-          const isSingle = q.questionType === 'single' || (!q.questionType && (!q.correctAnswers || q.correctAnswers.length <= 1));
-          if (!isSingle) return false;
-        } else if (chosenType === 'multiple') {
-          const isMulti = q.questionType === 'multiple' || (q.correctAnswers && q.correctAnswers.length > 1);
-          if (!isMulti) return false;
-        } else if (chosenType === 'true_false') {
-          if (q.questionType !== 'true_false') return false;
-        }
-      }
-
-      return true;
-    });
 
     if (matched.length === 0) {
       this.showToast('No questions match your filter criteria.', 'error');

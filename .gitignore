@@ -105,3 +105,11 @@ Thumbs.db
 *.class
 *~
 release_bundles/
+# ---------------------------------------------------------
+# Node / JavaScript
+# ---------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
